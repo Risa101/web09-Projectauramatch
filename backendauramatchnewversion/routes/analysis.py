@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from config.database import get_db
-from models.analysis import AnalysisResult
+from models.analysis import AnalysisResult, ColorPalette
+from models.product import Product
 from models.user import User
 from routes.auth import get_current_user
-from services.ai_service import analyze_face
+from routes.recommendations import generate_recs_for_analysis
+from services.ai_service import analyze_face, FACE_SHAPE_TIPS
 import os, shutil, uuid
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
@@ -44,7 +46,73 @@ async def create_analysis(
     db.add(analysis)
     db.commit()
     db.refresh(analysis)
-    return analysis
+
+    # ── Build enriched response ──────────────────────────────────────────────
+
+    # Auto-generate recommendations
+    recs = generate_recs_for_analysis(analysis, db)
+
+    # Load palette data
+    palette_data = None
+    if analysis.palette_id:
+        palette = db.query(ColorPalette).filter(
+            ColorPalette.palette_id == analysis.palette_id
+        ).first()
+        if palette:
+            palette_data = {
+                "palette_id": palette.palette_id,
+                "season": palette.season,
+                "sub_type": palette.sub_type,
+                "best_colors": palette.best_colors,
+                "avoid_colors": palette.avoid_colors,
+                "makeup_tips": palette.makeup_tips,
+            }
+
+    # Face shape tips
+    tips = FACE_SHAPE_TIPS.get(analysis.face_shape, {})
+
+    # Format recommendations
+    rec_list = []
+    for rec in recs[:20]:
+        p = (
+            db.query(Product)
+            .options(joinedload(Product.brand), joinedload(Product.links))
+            .filter(Product.product_id == rec.product_id)
+            .first()
+        )
+        if p:
+            rec_list.append({
+                "recommendation_id": rec.recommendation_id,
+                "score": float(rec.score) if rec.score else 0,
+                "product": {
+                    "product_id": p.product_id,
+                    "name": p.name,
+                    "price": float(p.price) if p.price else None,
+                    "image_url": p.image_url,
+                    "brand": p.brand.name if p.brand else None,
+                    "links": [
+                        {"platform": l.platform, "url": l.url}
+                        for l in p.links if l.is_active
+                    ],
+                },
+            })
+
+    return {
+        "analysis_id": analysis.analysis_id,
+        "user_id": analysis.user_id,
+        "image_path": analysis.image_path,
+        "gender": analysis.gender,
+        "face_shape": analysis.face_shape,
+        "skin_tone": analysis.skin_tone,
+        "skin_undertone": analysis.skin_undertone,
+        "personal_color": analysis.personal_color,
+        "ethnicity": analysis.ethnicity,
+        "confidence_score": float(analysis.confidence_score) if analysis.confidence_score else None,
+        "created_at": str(analysis.created_at) if analysis.created_at else None,
+        "palette": palette_data,
+        "face_shape_tips": tips,
+        "recommendations": rec_list,
+    }
 
 
 @router.get("/history")

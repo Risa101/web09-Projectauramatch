@@ -10,14 +10,9 @@ from routes.auth import get_current_user
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 
 
-@router.post("/generate/{analysis_id}")
-def generate_recommendations(analysis_id: int, db: Session = Depends(get_db)):
-    analysis = db.query(AnalysisResult).filter(AnalysisResult.analysis_id == analysis_id).first()
-    if not analysis:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-
-    # ลบ recommendations เก่าของ analysis นี้ก่อน (กันซ้ำ)
-    db.query(Recommendation).filter(Recommendation.analysis_id == analysis_id).delete()
+def generate_recs_for_analysis(analysis, db: Session) -> list:
+    """Generate recommendation records for an analysis. Returns list of Recommendation objects."""
+    db.query(Recommendation).filter(Recommendation.analysis_id == analysis.analysis_id).delete()
 
     rules = db.query(RecommendationRule).filter(
         (RecommendationRule.face_shape == analysis.face_shape) | (RecommendationRule.face_shape == "any"),
@@ -27,21 +22,31 @@ def generate_recommendations(analysis_id: int, db: Session = Depends(get_db)):
         (RecommendationRule.gender == analysis.gender) | (RecommendationRule.gender == "any"),
     ).order_by(RecommendationRule.priority.desc()).all()
 
-    recommendations = []
+    recs = []
     seen = set()
     for rule in rules:
         if rule.product_id not in seen:
             rec = Recommendation(
-                analysis_id=analysis_id,
+                analysis_id=analysis.analysis_id,
                 product_id=rule.product_id,
                 score=float(rule.priority)
             )
             db.add(rec)
-            recommendations.append(rec)
+            recs.append(rec)
             seen.add(rule.product_id)
 
     db.commit()
-    return {"message": f"Generated {len(recommendations)} recommendations", "count": len(recommendations)}
+    return recs
+
+
+@router.post("/generate/{analysis_id}")
+def generate_recommendations(analysis_id: int, db: Session = Depends(get_db)):
+    analysis = db.query(AnalysisResult).filter(AnalysisResult.analysis_id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    recs = generate_recs_for_analysis(analysis, db)
+    return {"message": f"Generated {len(recs)} recommendations", "count": len(recs)}
 
 
 @router.get("/{analysis_id}")

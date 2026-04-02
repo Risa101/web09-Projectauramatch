@@ -27,6 +27,9 @@ npm run preview    # Preview production build
 ```bash
 pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8001
+python3 -m pytest tests/ -v                              # Run all tests
+python3 -m pytest tests/test_color_analysis_service.py -v # Color science tests (67)
+python3 -m pytest tests/test_face_shape_decision_tree.py -v # Face shape threshold tests (39)
 ```
 
 ### Database
@@ -50,7 +53,7 @@ Backend requires a `.env` file — see `.env.example` for required variables (DB
 **Backend structure follows MVC pattern:**
 - `models/` — SQLAlchemy ORM models (declarative base). Uses enum fields for categorical data (face_shape, personal_color, season) and JSON columns for color palettes.
 - `routes/` — FastAPI APIRouter modules, each prefixed (e.g., `/auth`, `/analysis`, `/products`). Auth-protected routes use `get_current_user` dependency.
-- `services/` — Business logic layer. `ai_service.py` orchestrates face analysis, `color_analysis_service.py` handles CIELAB color science and CIEDE2000 matching, `recommendation_service.py` handles product matching, `gemini_service.py` wraps the Gemini API.
+- `services/` — Business logic layer. `ai_service.py` orchestrates the single-pass face analysis pipeline, `color_analysis_service.py` handles CIELAB color science and CIEDE2000 matching, `recommendation_service.py` handles product matching, `gemini_service.py` wraps the Gemini API.
 - `config/database.py` — SQLAlchemy engine and session setup.
 
 **Frontend structure:**
@@ -62,13 +65,47 @@ Backend requires a `.env` file — see `.env.example` for required variables (DB
 
 **Routes** (defined in `src/App.jsx`): `/` (Home), `/login`, `/register`, `/analyze`, `/products`, `/gemini`, `/editor`, `/profile`, `/admin`
 
+## Face Analysis Pipeline (Single-Pass Architecture)
+
+`analyze_face()` in `ai_service.py` runs one MediaPipe FaceMesh session via `_run_facemesh()`, which returns landmarks (468 points), a face bounding box, and a face crop. This data is reused for both face shape detection and skin extraction — never initialize FaceMesh twice per call.
+
+**Face shape detection** (`detect_face_shape()`) has two paths:
+1. **CNN path** (primary): Uses the face crop from `_run_facemesh()` with the model at `models_ai/face_shape_cnn.h5`. Produces all 7 shapes including triangle.
+2. **Geometry fallback**: When CNN is unavailable, uses MediaPipe landmark ratios. Produces 6 of 7 shapes (triangle is CNN-only).
+
+**Geometry decision tree thresholds** (locked by `tests/test_face_shape_decision_tree.py`):
+```
+ratio = face_height / cheekbone_width    (landmarks: 152↔10 / 234↔454)
+jaw_ratio = jaw_width / cheekbone_width  (landmarks: 172↔397 / 234↔454)
+temple_ratio = temple_width / cheekbone  (landmarks: 127↔356 / 234↔454)
+
+ratio > 1.5                           → oblong
+1.3 < ratio ≤ 1.5:
+  jaw_ratio < 0.75                    → heart
+  temple_ratio < 0.85                 → diamond
+  else                                → oval
+1.0 < ratio ≤ 1.3:
+  jaw_ratio > 0.9                     → square
+  jaw_ratio < 0.75                    → heart
+  temple_ratio < 0.85                 → diamond
+  else                                → oval
+ratio ≤ 1.0:
+  jaw_ratio > 0.9                     → square
+  else                                → round
+no face detected                      → oval (default)
+```
+If you change these thresholds, update `tests/test_face_shape_decision_tree.py` (39 characterization tests).
+
+**Skin extraction** uses the face bounding box to sample the cheek region (`extract_skin_lab_from_bbox()` in `color_analysis_service.py`) instead of a naive center-crop. Falls back to `extract_skin_lab()` when no face is detected.
+
+**Enriched API response**: `POST /analysis/` returns analysis results, palette data, face shape tips, and product recommendations in a single response. The frontend uses this with a fallback to separate `/recommendations/` calls. `generate_recs_for_analysis()` in `routes/recommendations.py` is the shared function used by both paths.
+
 ## Key Patterns
 
 - All backend routes are registered in `main.py` via `app.include_router()`
 - `Base.metadata.create_all(bind=engine)` auto-creates tables on startup
 - CORS is configured for local dev ports: 5173, 5175, 5177, 3000
 - File uploads go to `uploads/` directory, served as static files at `/uploads`
-- Pre-trained CNN model for face shape at `models_ai/face_shape_cnn.h5`
 - `personal_color` enum stays at 4 seasons (spring/summer/autumn/winter) for backward compatibility; 12-sub-season detail is accessed via `palette_id → ColorPalette.sub_type`
 
 ## Color Science Rules (MANDATORY)

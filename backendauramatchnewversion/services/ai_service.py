@@ -10,6 +10,17 @@ _CNN_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models_ai", "fa
 _CNN_CLASSES = ['diamond', 'heart', 'oblong', 'oval', 'round', 'square', 'triangle']
 _cnn_model = None
 
+FACE_SHAPE_TIPS = {
+    "oval": {"description": "Balanced proportions", "contouring": "Light contour on cheekbones", "styles": ["Most styles work well"]},
+    "round": {"description": "Equal width and height", "contouring": "Contour along jawline and temples", "styles": ["Angular frames", "Side-swept bangs"]},
+    "square": {"description": "Strong jawline, equal proportions", "contouring": "Soften jaw corners", "styles": ["Textured layers", "Side parts"]},
+    "heart": {"description": "Wider forehead, narrow chin", "contouring": "Contour forehead sides", "styles": ["Side-swept bangs", "Chin-length layers"]},
+    "oblong": {"description": "Longer than wide", "contouring": "Add width at cheekbones", "styles": ["Side-swept bangs", "Layered cuts"]},
+    "diamond": {"description": "Narrow forehead and jaw, wide cheekbones", "contouring": "Soften cheekbone prominence", "styles": ["Side-swept bangs", "Chin-length styles"]},
+    "triangle": {"description": "Wider jaw, narrow forehead", "contouring": "Add width at temples", "styles": ["Volume at crown", "Side-swept bangs"]},
+}
+
+
 def _load_cnn_model():
     global _cnn_model
     if _cnn_model is not None:
@@ -24,6 +35,32 @@ def _load_cnn_model():
     return _cnn_model
 
 
+# ── Single MediaPipe pass ────────────────────────────────────────────────────
+
+def _run_facemesh(rgb_image):
+    """Run MediaPipe FaceMesh once. Returns dict with landmarks/bbox/crop or None."""
+    with mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1) as fm:
+        results = fm.process(rgb_image)
+        if not results.multi_face_landmarks:
+            return None
+        h, w = rgb_image.shape[:2]
+        lm = results.multi_face_landmarks[0].landmark
+        landmarks = [(p.x, p.y, p.z) for p in lm]
+        xs = [p[0] * w for p in landmarks]
+        ys = [p[1] * h for p in landmarks]
+        x1, x2 = max(0, int(min(xs)) - 20), min(w, int(max(xs)) + 20)
+        y1, y2 = max(0, int(min(ys)) - 20), min(h, int(max(ys)) + 20)
+        face_crop = rgb_image[y1:y2, x1:x2]
+        return {
+            "landmarks": landmarks,
+            "bbox": (x1, y1, x2, y2),
+            "face_crop": face_crop if face_crop.size > 0 else None,
+            "h": h, "w": w,
+        }
+
+
+# ── Orchestrator ─────────────────────────────────────────────────────────────
+
 def analyze_face(image_path: str, gender: str = "female", db_session=None) -> dict:
     image = cv2.imread(image_path)
     if image is None:
@@ -31,12 +68,21 @@ def analyze_face(image_path: str, gender: str = "female", db_session=None) -> di
 
     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    face_shape = detect_face_shape(rgb)
+    # Single MediaPipe pass — reused for face shape + skin extraction
+    facemesh_data = _run_facemesh(rgb)
+
+    face_shape = detect_face_shape(rgb, facemesh_data=facemesh_data)
 
     from services.color_analysis_service import (
-        extract_skin_lab, classify_tone_from_lab, classify_undertone_from_lab,
+        extract_skin_lab, extract_skin_lab_from_bbox,
+        classify_tone_from_lab, classify_undertone_from_lab,
     )
-    skin_lab = extract_skin_lab(rgb)
+
+    if facemesh_data and facemesh_data["face_crop"] is not None:
+        skin_lab = extract_skin_lab_from_bbox(rgb, facemesh_data["bbox"])
+    else:
+        skin_lab = extract_skin_lab(rgb)
+
     skin_tone = classify_tone_from_lab(skin_lab[0])
     skin_undertone = classify_undertone_from_lab(skin_lab[1], skin_lab[2])
 
@@ -55,65 +101,67 @@ def analyze_face(image_path: str, gender: str = "female", db_session=None) -> di
     }
 
 
-def _crop_face_mediapipe(rgb_image):
-    """Crop face region using MediaPipe bounding box. Returns cropped BGR or None."""
-    with mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1) as face_mesh:
-        results = face_mesh.process(rgb_image)
-        if not results.multi_face_landmarks:
-            return None
-        h, w = rgb_image.shape[:2]
-        lm = results.multi_face_landmarks[0].landmark
-        xs = [p.x * w for p in lm]
-        ys = [p.y * h for p in lm]
-        x1, x2 = max(0, int(min(xs)) - 20), min(w, int(max(xs)) + 20)
-        y1, y2 = max(0, int(min(ys)) - 20), min(h, int(max(ys)) + 20)
-        face = rgb_image[y1:y2, x1:x2]
-        return face if face.size > 0 else None
+# ── Face shape detection ─────────────────────────────────────────────────────
 
+def detect_face_shape(rgb_image, facemesh_data=None) -> str:
+    if facemesh_data is None:
+        facemesh_data = _run_facemesh(rgb_image)
 
-def detect_face_shape(rgb_image) -> str:
     model = _load_cnn_model()
-    if model is not None:
-        face_crop = _crop_face_mediapipe(rgb_image)
-        if face_crop is not None:
-            img = cv2.resize(face_crop, (200, 200)).astype("float32") / 255.0
-            pred = model.predict(np.expand_dims(img, axis=0), verbose=0)
-            return _CNN_CLASSES[int(np.argmax(pred))]
+    if model is not None and facemesh_data and facemesh_data["face_crop"] is not None:
+        face_crop = facemesh_data["face_crop"]
+        img = cv2.resize(face_crop, (200, 200)).astype("float32") / 255.0
+        pred = model.predict(np.expand_dims(img, axis=0), verbose=0)
+        return _CNN_CLASSES[int(np.argmax(pred))]
 
     # ── Fallback: MediaPipe geometry ──────────────────────────────────────────
-    with mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1) as face_mesh:
-        results = face_mesh.process(rgb_image)
-        if not results.multi_face_landmarks:
-            return "oval"
+    if not facemesh_data:
+        return "oval"
 
-        landmarks = results.multi_face_landmarks[0].landmark
-        h, w = rgb_image.shape[:2]
+    landmarks = facemesh_data["landmarks"]
+    h, w = facemesh_data["h"], facemesh_data["w"]
 
-        chin = landmarks[152]
-        forehead = landmarks[10]
-        left_cheek = landmarks[234]
-        right_cheek = landmarks[454]
-        left_jaw = landmarks[172]
-        right_jaw = landmarks[397]
+    def _px(idx):
+        return landmarks[idx][0] * w, landmarks[idx][1] * h
 
-        face_width = abs(right_cheek.x - left_cheek.x) * w
-        face_height = abs(chin.y - forehead.y) * h
-        jaw_width = abs(right_jaw.x - left_jaw.x) * w
+    chin = _px(152)
+    forehead = _px(10)
+    left_cheek = _px(234)
+    right_cheek = _px(454)
+    left_jaw = _px(172)
+    right_jaw = _px(397)
+    left_temple = _px(127)
+    right_temple = _px(356)
 
-        ratio = face_height / face_width if face_width > 0 else 1.3
+    cheekbone_width = abs(right_cheek[0] - left_cheek[0])
+    face_height = abs(chin[1] - forehead[1])
+    jaw_width = abs(right_jaw[0] - left_jaw[0])
+    temple_width = abs(right_temple[0] - left_temple[0])
 
-        if ratio > 1.5:
-            return "oblong"
-        elif ratio > 1.3:
-            return "oval"
-        elif ratio > 1.1:
-            if jaw_width / face_width > 0.85:
-                return "square"
+    ratio = face_height / cheekbone_width if cheekbone_width > 0 else 1.3
+    jaw_ratio = jaw_width / cheekbone_width if cheekbone_width > 0 else 0.8
+    temple_ratio = temple_width / cheekbone_width if cheekbone_width > 0 else 0.9
+
+    if ratio > 1.5:
+        return "oblong"
+    elif ratio > 1.3:
+        if jaw_ratio < 0.75:
             return "heart"
-        elif ratio > 0.9:
-            return "round"
-        else:
+        if temple_ratio < 0.85:
+            return "diamond"
+        return "oval"
+    elif ratio > 1.0:
+        if jaw_ratio > 0.9:
             return "square"
+        if jaw_ratio < 0.75:
+            return "heart"
+        if temple_ratio < 0.85:
+            return "diamond"
+        return "oval"
+    else:
+        if jaw_ratio > 0.9:
+            return "square"
+        return "round"
 
 
 def detect_skin_tone(rgb_image) -> tuple:

@@ -38,6 +38,34 @@ def extract_skin_lab(rgb_image: np.ndarray) -> tuple:
     return float(dominant_lab[0]), float(dominant_lab[1]), float(dominant_lab[2])
 
 
+def extract_skin_lab_from_bbox(rgb_image: np.ndarray, bbox: tuple) -> tuple:
+    """Extract dominant skin color from the cheek region within a face bounding box.
+
+    Samples the middle third of the face bbox (cheek area), filters outlier
+    pixels (hair, highlights), then clusters with K-Means.
+    """
+    x1, y1, x2, y2 = bbox
+    bh, bw = y2 - y1, x2 - x1
+    cheek = rgb_image[y1 + bh // 3:y1 + 2 * bh // 3, x1 + bw // 4:x1 + 3 * bw // 4]
+    if cheek.size == 0:
+        return extract_skin_lab(rgb_image)
+
+    pixels = cheek.reshape(-1, 3)
+    lab_pixels = rgb_to_lab(pixels)
+
+    # Filter outliers: very dark (hair/eyebrows) and very bright (highlights)
+    mask = (lab_pixels[:, 0] > 20) & (lab_pixels[:, 0] < 95)
+    lab_filtered = lab_pixels[mask] if mask.sum() > 50 else lab_pixels
+
+    kmeans = KMeans(n_clusters=3, n_init=10, random_state=42)
+    kmeans.fit(lab_filtered)
+
+    largest_cluster = np.argmax(np.bincount(kmeans.labels_))
+    c = kmeans.cluster_centers_[largest_cluster]
+
+    return float(c[0]), float(c[1]), float(c[2])
+
+
 def classify_tone_from_lab(L: float) -> str:
     """Map CIELAB L* lightness (0-100) to a skin tone enum string."""
     if L > 78:

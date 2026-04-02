@@ -62,12 +62,17 @@ export default function Analyze() {
       setResult(res.data)
       trackAnalysis(res.data)
 
-      // หลังวิเคราะห์เสร็จ → generate recommendations
-      setLoadingRecs(true)
-      const analysisId = res.data.analysis_id
-      await api.post(`/recommendations/generate/${analysisId}`)
-      const recsRes = await api.get(`/recommendations/${analysisId}`)
-      setRecommendations(recsRes.data)
+      // Recommendations now included in enriched response
+      if (res.data.recommendations?.length) {
+        setRecommendations(res.data.recommendations)
+      } else {
+        // Fallback: generate separately if not included
+        setLoadingRecs(true)
+        const analysisId = res.data.analysis_id
+        await api.post(`/recommendations/generate/${analysisId}`)
+        const recsRes = await api.get(`/recommendations/${analysisId}`)
+        setRecommendations(recsRes.data)
+      }
     } catch (err) {
       alert('เกิดข้อผิดพลาดในการวิเคราะห์')
     } finally {
@@ -285,6 +290,46 @@ export default function Analyze() {
                           style={{ width: `${result.confidence_score}%` }}
                         />
                       </div>
+                    </div>
+                  )}
+
+                  {/* Face Shape Tips */}
+                  {result.face_shape_tips?.description && (
+                    <div className="tips-section">
+                      <p className="tips-label">คำแนะนำสำหรับรูปหน้า {FACE_SHAPE_TH[result.face_shape] || result.face_shape}</p>
+                      <p className="tips-description">{result.face_shape_tips.description}</p>
+                      {result.face_shape_tips.contouring && (
+                        <p className="tips-contouring">
+                          <strong>Contouring:</strong> {result.face_shape_tips.contouring}
+                        </p>
+                      )}
+                      {result.face_shape_tips.styles?.length > 0 && (
+                        <div className="tips-styles">
+                          {result.face_shape_tips.styles.map((s, i) => (
+                            <span key={i} className="tips-style-tag">{s}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Palette Colors */}
+                  {result.palette?.best_colors?.colors?.length > 0 && (
+                    <div className="palette-section">
+                      <p className="palette-label">
+                        Best Colors — {result.palette.sub_type}
+                      </p>
+                      <div className="palette-swatches">
+                        {result.palette.best_colors.colors.map((c, i) => (
+                          <div key={i} className="swatch" title={c.name}>
+                            <div className="swatch-color" style={{ backgroundColor: c.hex }} />
+                            <span className="swatch-name">{c.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {result.palette.makeup_tips && (
+                        <p className="palette-tips">{result.palette.makeup_tips}</p>
+                      )}
                     </div>
                   )}
                 </div>
