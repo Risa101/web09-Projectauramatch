@@ -1,0 +1,257 @@
+/* ─── CSS Variables ─── */
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+:root {
+  --font-heading: 'Prompt', 'Noto Sans Thai', sans-serif;
+  --font-body: 'Prompt', 'Noto Sans Thai', sans-serif;
+  --color-purple: #7c3aed;
+  --color-purple-light: #c084fc;
+  --color-pink: #f472b6;
+  --color-pink-dark: #db2777;
+  --color-text: #1f1f1f;
+  --color-text-muted: #6b7280;
+  --color-text-light: #9ca3af;
+  --color-border: #e5e7eb;
+  --color-bg: #faf9f7;
+  --color-error-bg: #fef2f2;
+  --color-error-text: #dc2626;
+}
+
+/* ─── Page ─── */
+.register-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  background-color: var(--color-bg);
+}
+
+/* ─── Decorative Background ─── */
+.register-bg-wrapper {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.register-bg-accent--purple {
+  position: absolute;
+  top: -10rem;
+  right: -10rem;
+  width: 24rem;
+  height: 24rem;
+  border-radius: 50%;
+  opacity: 0.1;
+  background: radial-gradient(circle, var(--color-purple-light), transparent);
+}
+
+.register-bg-accent--pink {
+  position: absolute;
+  bottom: -8rem;
+  left: -8rem;
+  width: 20rem;
+  height: 20rem;
+  border-radius: 50%;
+  opacity: 0.1;
+  background: radial-gradient(circle, var(--color-pink), transparent);
+}
+
+/* ─── Card ─── */
+.register-container {
+  position: relative;
+  width: 100%;
+  max-width: 28rem;
+}
+
+.register-card {
+  background-color: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 40px rgba(0, 0, 0, 0.06);
+  padding: 2.5rem;
+}
+
+/* ─── Branding ─── */
+.register-branding {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.register-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.register-logo-text {
+  font-family: 'Cormorant Garamond', var(--font-heading);
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--color-text);
+}
+
+.register-logo-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  transform: translateY(-0.25rem);
+  background: linear-gradient(135deg, var(--color-purple), var(--color-pink));
+}
+
+.register-title {
+  font-family: 'Cormorant Garamond', var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 0.25rem;
+}
+
+.register-subtitle {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-text-light);
+}
+
+/* ─── Error ─── */
+.register-error {
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  text-align: center;
+  background-color: var(--color-error-bg);
+  color: var(--color-error-text);
+}
+
+/* ─── Form ─── */
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.register-label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  color: var(--color-text-muted);
+}
+
+.register-input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.register-input:focus {
+  border-color: var(--color-purple-light);
+  box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.1);
+}
+
+/* ─── Submit Button ─── */
+.register-btn {
+  width: 100%;
+  padding: 0.875rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--color-purple), var(--color-pink-dark));
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.register-btn:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+  transform: translateY(-1px);
+}
+
+.register-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.register-btn-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.register-spinner {
+  animation: register-spin 1s linear infinite;
+  height: 1rem;
+  width: 1rem;
+  color: #fff;
+}
+
+@keyframes register-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.register-spinner-track {
+  opacity: 0.25;
+}
+
+.register-spinner-head {
+  opacity: 0.75;
+}
+
+/* ─── Divider ─── */
+.register-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.register-divider-line {
+  flex: 1;
+  height: 1px;
+  background-color: var(--color-border);
+}
+
+.register-divider-text {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--color-text-light);
+}
+
+/* ─── Footer Link ─── */
+.register-footer {
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.register-link {
+  font-weight: 600;
+  color: var(--color-purple);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.register-link:hover {
+  color: var(--color-pink-dark);
+}
