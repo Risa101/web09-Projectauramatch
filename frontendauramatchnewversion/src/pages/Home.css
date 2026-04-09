@@ -429,6 +429,56 @@
 }
 
 /* ══════════════════════
+   BANNER CAROUSEL
+   ══════════════════════ */
+.banner-carousel {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 48px;
+  overflow: hidden;
+}
+.banner-carousel__track {
+  display: flex;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.banner-carousel__slide {
+  flex: 0 0 100%;
+  width: 100%;
+  display: block;
+  text-decoration: none;
+}
+.banner-carousel__slide img {
+  width: 100%;
+  height: auto;
+  border-radius: 1rem;
+  object-fit: cover;
+  aspect-ratio: 21 / 9;
+}
+.banner-carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 1rem;
+}
+.banner-carousel__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.banner-carousel__dot--active {
+  background: #7c3aed;
+  width: 24px;
+  border-radius: 4px;
+}
+
+/* ══════════════════════
    HOW IT WORKS
    ══════════════════════ */
 .how-section {
@@ -948,6 +998,9 @@
 }
 
 @media (max-width: 768px) {
+  .banner-carousel { padding: 2rem 20px; }
+  .banner-carousel__slide img { aspect-ratio: 16 / 9; border-radius: 0.75rem; }
+
   .home-navbar { padding: 12px 20px; }
   .home-navbar-links { display: none; }
   .home-navbar-cta .btn-outline { display: none; }

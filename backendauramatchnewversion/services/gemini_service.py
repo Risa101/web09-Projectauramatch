@@ -7,7 +7,15 @@ load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
 
-model = genai.GenerativeModel("gemini-2.0-flash-exp")
+model = genai.GenerativeModel("gemini-2.5-flash")
+
+
+def create_gemini_model(system_instruction: str = None):
+    """Create a GenerativeModel with optional system instruction."""
+    kwargs = {}
+    if system_instruction:
+        kwargs["system_instruction"] = system_instruction
+    return genai.GenerativeModel("gemini-2.5-flash", **kwargs)
 
 
 async def generate_with_gemini(prompt: str, image_path: str = None) -> tuple:

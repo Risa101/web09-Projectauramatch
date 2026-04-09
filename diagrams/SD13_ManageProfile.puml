@@ -1,0 +1,47 @@
+@startuml SD13_ManageProfile
+title SD-13 Manage Profile
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":ProfilePage" as PP
+control ":ProfileController" as PC
+entity ":ProfileDB" as DB
+
+User -> PP : openPage()
+activate PP
+
+PP -> PC : getProfile(token)
+activate PC
+
+PC -> DB : queryProfile(user_id)
+activate DB
+DB --> PC : Return profileData
+deactivate DB
+
+PC --> PP : Return profileData
+deactivate PC
+
+PP --> User : displayProfile(\nemail, username, join_date,\nfirst_name, last_name,\ndisplay_name, bio,\ngender, nationality)
+
+User -> PP : editFields(\nfirst_name, last_name,\ndisplay_name, bio,\ngender, nationality)
+
+User -> PP : clickSave()
+
+PP -> PC : updateProfile(fields)
+activate PC
+
+PC -> DB : updateProfile(user_id, fields)
+activate DB
+DB --> PC : Return Success
+deactivate DB
+
+PC --> PP : Return Success
+deactivate PC
+
+PP --> User : displaySuccess("Saved successfully")
+deactivate PP
+
+@enduml

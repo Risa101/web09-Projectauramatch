@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { LogOut, User, LayoutDashboard, Menu, X, Sparkles, ShoppingBag, ImageIcon, BotMessageSquare } from 'lucide-react'
+import { LogOut, User, LayoutDashboard, Menu, X, Sparkles, ShoppingBag, ImageIcon, BotMessageSquare, BookOpen } from 'lucide-react'
 import './Navbar.css'
 
 const navLinks = [
@@ -9,6 +9,7 @@ const navLinks = [
   { to: '/products', label: 'สินค้า', icon: ShoppingBag },
   { to: '/editor', label: 'แต่งรูป', icon: ImageIcon },
   { to: '/gemini', label: 'Gemini AI', icon: BotMessageSquare },
+  { to: '/blog', label: 'บทความ', icon: BookOpen },
 ]
 
 export default function Navbar() {

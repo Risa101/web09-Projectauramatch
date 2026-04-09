@@ -1,0 +1,59 @@
+@startuml SD01_Register
+title SD-01 Register
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":RegisterPage" as RP
+control ":AuthController" as AC
+entity ":UserDB" as DB
+boundary ":LoginPage" as LP
+
+User -> RP : register(username, email, password)
+activate RP
+
+RP -> AC : validateRegister(username, email, password)
+activate AC
+
+AC -> DB : checkDuplicate(email, username)
+activate DB
+DB --> AC : Return Result
+deactivate DB
+
+AC -> AC : hashPassword(bcrypt)
+
+AC -> DB : saveUser(username, email, hash)
+activate DB
+DB --> AC : Return Success
+deactivate DB
+
+AC --> RP : successMessage
+deactivate AC
+
+RP -> LP : redirect()
+activate LP
+deactivate LP
+deactivate RP
+
+== alt [email/username duplicated] ==
+
+User -> RP : register(username, email, password)
+activate RP
+
+RP -> AC : validateRegister(username, email, password)
+activate AC
+
+AC -> DB : checkDuplicate(email, username)
+activate DB
+DB --> AC : Return Duplicate
+deactivate DB
+
+AC --> RP : errorMessageScript
+deactivate AC
+
+RP --> User : errorMessage("Duplicate data")
+deactivate RP
+
+@enduml

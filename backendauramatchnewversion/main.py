@@ -1,8 +1,14 @@
+import logging
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from config.database import engine, Base
-import os
+from config.redis_config import check_redis_health
+from config.chromadb_config import check_chromadb_health
+
+logger = logging.getLogger(__name__)
 
 # Import all models to register them
 import models.user
@@ -18,7 +24,7 @@ import models.behavior
 import models.saved_look
 
 # Import routes
-from routes import auth, products, analysis, recommendations, gemini, commission, profile, landmarks, behavior, saved_looks
+from routes import auth, products, analysis, recommendations, gemini, commission, profile, landmarks, behavior, saved_looks, favorites, skin_concerns, reviews, blog, banner
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -55,6 +61,30 @@ app.include_router(profile.router)
 app.include_router(landmarks.router)
 app.include_router(behavior.router)
 app.include_router(saved_looks.router)
+app.include_router(favorites.router)
+app.include_router(skin_concerns.router)
+app.include_router(reviews.router)
+app.include_router(blog.router)
+app.include_router(banner.router)
+
+
+@app.on_event("startup")
+def startup_event():
+    redis_status = check_redis_health()
+    if redis_status["status"] == "connected":
+        logger.info("Redis connected at %s:%s", redis_status["host"], redis_status["port"])
+    else:
+        logger.warning("Redis: %s", redis_status["message"])
+
+    chroma_status = check_chromadb_health()
+    if chroma_status["status"] == "connected":
+        logger.info(
+            "ChromaDB: %d products indexed at %s",
+            chroma_status["product_count"],
+            chroma_status["path"],
+        )
+    else:
+        logger.warning("ChromaDB: %s (TF-IDF fallback active)", chroma_status["message"])
 
 
 @app.get("/")

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Enum, ForeignKey, DateTime, JSON, Date, DECIMAL
+from sqlalchemy import Column, Integer, String, Text, Enum, ForeignKey, DateTime, JSON, Date, DECIMAL, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from config.database import Base
@@ -67,6 +67,7 @@ class ProductConcern(Base):
 
 class ProductReview(Base):
     __tablename__ = "product_reviews"
+    __table_args__ = (UniqueConstraint("user_id", "product_id", name="uq_product_review"),)
 
     review_id = Column(Integer, primary_key=True, autoincrement=True)
     product_id = Column(Integer, ForeignKey("products.product_id", ondelete="CASCADE"), nullable=False)

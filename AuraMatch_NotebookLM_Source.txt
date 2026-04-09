@@ -1,0 +1,569 @@
+# AuraMatch — AI-Powered Beauty Recommendation Platform
+# Complete Project Documentation for NotebookLM
+# Last updated: 2026-04-09
+
+## 1. Project Overview
+
+AuraMatch is a full-stack AI-powered beauty/cosmetics recommendation platform. It analyzes facial structure and personal color to recommend makeup products.
+
+**Core Features:**
+- Face shape detection (7 shapes: oval, round, square, heart, oblong, diamond, triangle)
+- Skin tone analysis (6 levels: fair/light/medium/tan/dark/deep) using ITA formula
+- Undertone classification (warm/cool/neutral) using CIELAB hue angle
+- Personal color season classification (4 seasons, 12 sub-seasons via CIEDE2000)
+- 6-signal scoring engine for product recommendations (S1–S6)
+- Product catalog with compare feature (up to 3 products, color match % via S2+S4)
+- Real-time photo editor with makeup try-on
+- AI chat via Google Gemini for beauty advice
+- Affiliate commission tracking (Shopee, TikTok, Lazada, Sephora, Watsons, Ulta)
+- User behavior analytics with event tracking
+- Blog, favorites, reviews, skin concerns, banners
+
+**Tech Stack:**
+- Frontend: React 19 + Vite 8, Tailwind CSS 4, React Router DOM 7, Axios
+- Backend: Python FastAPI, SQLAlchemy 2.0, MySQL (PyMySQL)
+- AI/ML: OpenCV, MediaPipe FaceMesh (468 landmarks), dlib (68 landmarks), TensorFlow/Keras (CNN), Google Gemini 2.0
+- Color Science: colour-science library (CIELAB, CIEDE2000), scikit-learn (K-Means)
+- Auth: JWT (HS256) with bcrypt password hashing
+
+---
+
+## 2. System Architecture
+
+Monorepo with two independent apps:
+- frontendauramatchnewversion/ — React SPA (Vite dev server on port 5175)
+- backendauramatchnewversion/ — FastAPI REST API (uvicorn on port 8001)
+
+API Proxy: Vite proxies /api/* to localhost:8001, stripping the /api prefix.
+Frontend Axios instance at src/api/axios.js prepends /api and injects JWT Bearer token.
+
+---
+
+## 3. All API Endpoints (15 routers)
+
+### Auth (/auth)
+- POST /auth/register — Register new user (username, email, password). Auto-creates UserProfile.
+- POST /auth/login — Authenticate user, return JWT access token.
+
+### Profile (/profile)
+- GET /profile/ — Fetch authenticated user's profile and settings.
+- PUT /profile/ — Update profile (first_name, last_name, display_name, bio, gender, nationality).
+- GET /profile/analyses — Get all analysis history for current user.
+
+### Analysis (/analysis)
+- POST /analysis/ — Upload photo → AI analyzes face shape, skin tone, undertone, personal color. Auto-generates recommendations. Returns enriched response with palette data, face shape tips, and product recommendations.
+- GET /analysis/history — Fetch all analyses for current user.
+- GET /analysis/{analysis_id} — Fetch single analysis result.
+
+### Products (/products)
+- GET /products/brands — List all active brands.
+- GET /products/categories — List all product categories.
+- GET /products/ — List products with filtering (category_id, brand_id, personal_color, search, sort).
+- GET /products/similar/{product_id} — Find similar products via TF-IDF Cosine Similarity.
+- GET /products/by-category — Filter by category name (LIKE search).
+- GET /products/makeup-recommendations — Get products by makeup parts (lips, eyes, eyebrows, nose, blush).
+- GET /products/{product_id} — Fetch single product details.
+- POST /products/ — Create new product.
+- PUT /products/{product_id} — Update product.
+- DELETE /products/{product_id} — Delete product.
+- POST /products/{product_id}/links — Add purchase link.
+
+### Recommendations (/recommendations)
+- POST /recommendations/generate/{analysis_id} — Generate personalized recommendations using 6-signal scoring.
+- GET /recommendations/{analysis_id} — Fetch recommendations grouped by category.
+- POST /recommendations/feedback/{recommendation_id} — Record like/dislike feedback.
+- POST /recommendations/compare — Compare products with color match % (S2+S4 scores).
+
+### Gemini AI Chat (/gemini)
+- POST /gemini/session — Create new AI chat session.
+- POST /gemini/session/{session_id}/chat — Send prompt + optional image to Gemini AI.
+- GET /gemini/session/{session_id}/messages — Fetch chat history.
+
+### Commission Tracking (/commission)
+- POST /commission/click/{link_id} — Track affiliate link clicks.
+- GET /commission/stats — Fetch click and commission statistics by platform.
+
+### Face Landmarks (/landmarks)
+- POST /landmarks/detect — Detect 68 facial landmarks using dlib.
+
+### Behavior Analytics (/behavior)
+- POST /behavior/track — Track single user behavior event.
+- POST /behavior/track-batch — Batch track multiple events.
+- GET /behavior/analytics/summary — Analytics summary for past N days.
+- GET /behavior/analytics/top-products — Most viewed products.
+- GET /behavior/analytics/top-searches — Popular search queries.
+- GET /behavior/analytics/filter-usage — Filter usage statistics.
+- GET /behavior/analytics/makeup-behavior — Popular makeup colors and presets.
+- GET /behavior/analytics/personal-color-demand — Season demand statistics.
+- GET /behavior/analytics/click-funnel — Conversion funnel (views → clicks).
+
+### Saved Looks (/looks)
+- GET /looks/categories — List look categories (morning, night, party, work, Korean, natural).
+- GET /looks/ — Fetch all saved looks for user.
+- POST /looks/ — Save new makeup/filter look.
+- PUT /looks/{look_id} — Update look.
+- DELETE /looks/{look_id} — Delete look.
+
+### Favorites (/favorites)
+- POST /favorites/{product_id} — Add product to favorites.
+- DELETE /favorites/{product_id} — Remove from favorites.
+- GET /favorites/ — List user's favorites.
+
+### Skin Concerns (/skin-concerns)
+- GET /skin-concerns/ — List all skin concerns.
+- POST /skin-concerns/user — Set user's skin concerns.
+- GET /skin-concerns/user — Get user's skin concerns.
+- GET /skin-concerns/products — Products matching user's skin concerns.
+
+### Reviews (/reviews)
+- POST /reviews/ — Create product review.
+- GET /reviews/product/{product_id} — Get reviews for product.
+- GET /reviews/user — Get user's reviews.
+
+### Blog (/blog)
+- GET /blog/categories — List blog categories.
+- GET /blog/ — List published blog posts.
+- GET /blog/{post_id} — Get single blog post.
+
+### Banner (/banner)
+- GET /banner/ — List active banners.
+
+---
+
+## 4. Database Schema (37 tables — auramatch.sql)
+
+### User & Profile
+- User: user_id, username (unique), email (unique), password_hash, role (admin|user), is_active, created_at
+- UserProfile: profile_id, user_id (FK), first_name, last_name, display_name, avatar_url, birth_date, gender, nationality, bio
+- UserSetting: setting_id, user_id (FK), dark_mode, language, notification_enabled
+
+### Analysis
+- AnalysisResult: analysis_id, user_id (FK), image_path, gender, ethnicity, nationality, face_shape (7 enum values), skin_tone (6 enum values), skin_undertone (warm|cool|neutral), personal_color (spring|summer|autumn|winter), palette_id (FK), confidence_score, created_at
+- ColorPalette: palette_id, season, sub_type (12 sub-seasons), description, best_colors (JSON with L,a,b values and skin_reference centroid), avoid_colors (JSON), makeup_tips, created_at
+- AnalysisReview: review_id, analysis_id (FK), user_id (FK), is_accurate, comment
+
+### Products
+- Product: product_id, brand_id (FK), category_id (FK), name, description, price, image_url, personal_color (comma-separated seasons), commission_rate, is_active
+- Brand: brand_id, name, logo_url, website_url, description, is_active
+- ProductCategory: category_id, name (ลิปสติก|รองพื้น|บลัชออน|อายแชโดว์|ไฮไลท์|คอนซีลเลอร์|สกินแคร์)
+- ProductLink: link_id, product_id (FK), platform (shopee|tiktok|lazada|sephora|watsons|ulta), url, is_active
+- ProductColorShade: shade_id, product_id (FK), shade_name, shade_code ({tone}_{undertone}), hex_color (#RRGGBB), image_url
+- ProductTag, ProductTagMap: Tagging system for products
+
+### Recommendations
+- RecommendationRule: rule_id, product_id (FK), face_shape, skin_tone, skin_undertone, personal_color, gender, ethnicity, priority (used for S1 score)
+- Recommendation: recommendation_id, analysis_id (FK), product_id (FK), score
+- RecommendationFeedback: feedback_id, recommendation_id (FK), user_id (FK), rating (like|dislike)
+- Favorite: favorite_id, user_id (FK), product_id (FK)
+
+### Commission & Affiliate
+- ClickLog: log_id, link_id (FK), user_id (FK), platform, ip_address, user_agent, clicked_at
+- Commission: commission_id, link_id (FK), user_id (FK), platform, amount, status (pending|confirmed|paid)
+
+### Content
+- BlogPost: post_id, category_id (FK), author_id (FK), title, slug, content, thumbnail_url, views, is_published
+- BlogCategory: category_id, name, description
+- Banner: banner_id, title, image_url, link_url, position, starts_at, ends_at, is_active
+
+### Gemini Chat
+- GeminiSession: session_id, user_id (FK), analysis_id (FK), title
+- GeminiMessage: message_id, session_id (FK), role (user|model), prompt, response, image_input, image_output
+
+### Photo Editor
+- PhotoEdit: edit_id, user_id (FK), original_image, edited_image, edit_config (JSON), source (upload|analysis|gemini)
+- EditFilter: filter_id, name, category (beauty|color|light|vintage|makeup), config (JSON)
+- EditSticker: sticker_id, name, category (face|decoration|text|emoji), image_url
+- SavedLook: look_id, user_id (FK), name, category, makeup_data (JSON NOT NULL), filter_data (JSON), thumbnail_url
+
+### Analytics & Misc
+- UserBehavior: id, user_id (FK nullable), session_id, event_type, event_data (JSON), page, created_at
+- SearchHistory: search_id, user_id, keyword
+- Notification: notification_id, user_id, title, message, type (recommendation|promotion|system|review), is_read
+- SkinConcern, UserSkinConcern, ProductConcern: Skin concern tracking system
+- ProductReview: review_id, product_id (FK), user_id (FK), rating, comment, platform, is_verified
+- PasswordReset: reset_id, user_id (FK), token, expires_at
+- AdminLog: log_id, admin_id (FK), action, table_name, record_id, old_value (JSON), new_value (JSON)
+
+---
+
+## 5. Core AI/ML Pipeline
+
+### Face Analysis Pipeline (Single-Pass Architecture)
+analyze_face() in ai_service.py runs ONE MediaPipe FaceMesh session:
+1. _run_facemesh(rgb_image) → returns landmarks (468 points), face bounding box, face crop
+2. detect_face_shape(rgb_image, facemesh_data) → CNN primary path or geometry fallback
+3. extract_skin_lab_from_bbox(rgb_image, bbox) → K-Means clustering (3 clusters) on cheek region
+4. classify_tone_from_lab(L*, b*) → ITA formula → 6 tone classes
+5. classify_undertone_from_lab(a*, b*) → hue angle → warm/cool/neutral
+6. match_season_by_delta_e(skin_lab, palette_refs) → season + palette_id + confidence
+
+Landmark coordinates are converted to tuples before exiting MediaPipe context manager (underlying data becomes invalid after context exits).
+
+### Face Shape Detection
+**CNN Path (Primary):** Model at models_ai/face_shape_cnn.h5, produces all 7 shapes including triangle.
+**Geometry Fallback:** Uses MediaPipe landmark ratios:
+- ratio = face_height / cheekbone_width (landmarks 152↔10 / 234↔454)
+- jaw_ratio = jaw_width / cheekbone_width (landmarks 172↔397 / 234↔454)
+- temple_ratio = temple_width / cheekbone (landmarks 127↔356 / 234↔454)
+
+Decision tree (Farkas 1994 anthropometric thresholds):
+- ratio > 1.45 → oblong (hyperleptoprosopic)
+- 1.30 < ratio ≤ 1.45:
+  - jaw_ratio < 0.70 → heart
+  - temple_ratio < 0.82 → diamond
+  - else → oval (leptoprosopic)
+- 1.15 < ratio ≤ 1.30:
+  - jaw_ratio > 0.85 → square
+  - jaw_ratio < 0.70 → heart
+  - temple_ratio < 0.82 → diamond
+  - else → oval (mesoprosopic)
+- ratio ≤ 1.15:
+  - jaw_ratio > 0.85 → square
+  - else → round (euryprosopic)
+- no face → oval (default)
+
+Reference: Farkas, L. G. (1994). Anthropometry of the Head and Face (2nd ed.). Raven Press.
+Farkas normative data: total facial index mean 1.28 (SD ~0.06), mandibular-bizygomatic mean 0.71 (SD ~0.04), frontal-bizygomatic mean 0.87 (SD ~0.03).
+
+### Color Science Rules
+1. **Always use CIELAB (L*a*b*) color space** — never raw RGB for color analysis. RGB is device-dependent and perceptually non-uniform.
+2. **CIEDE2000 (ΔE00)** for all color distance calculations — not CIE76 or CIE94. Reference: Sharma, G., Wu, W., & Dalal, E. N. (2005). Color Research & Application, 30(1), 21-30.
+3. **Skin tone via ITA (Individual Typology Angle):** ITA = arctan((L* - 50) / b*) × 180/π. Thresholds: >55° fair, >41° light, >28° medium, >10° tan, >-30° dark, ≤-30° deep. Reference: Chardon, A., et al. (1991). Int J Cosmet Sci, 13(4), 191-208. Del Bino, S. & Bernerd, F. (2013). Br J Dermatol, 169(s3), 33-40.
+4. **Undertone via CIELAB hue angle:** h_ab = atan2(b*, a*) in degrees. >65° warm, <50° cool, 50-65° neutral. Never use raw a*/b* thresholds. Reference: Xiao, K., et al. (2017). Skin Res Technol, 23(1), 21-29. Ly, B. C. K., et al. (2020). J Invest Dermatol, 140(1), 3-12.
+5. **Season matching uses Delta E distance** against color_palettes.best_colors.skin_reference centroids. Not hardcoded lookup dicts.
+6. **Palette data stored in CIELAB** with {"L", "a", "b"} format in JSON columns.
+7. **colour-science library** (import colour) is the canonical dependency. RGB→CIELAB path: sRGB → XYZ (D65) → L*a*b*.
+
+### Skin Extraction
+- extract_skin_lab_from_bbox(): Uses face bounding box to sample cheek region (middle third vertically, inner half horizontally)
+- Filters outlier pixels: L* < 20 (hair/eyebrows) or L* > 95 (highlights)
+- K-Means Clustering (3 clusters) → largest cluster = dominant skin color
+- Falls back to extract_skin_lab() (center-crop) when no face detected
+
+---
+
+## 6. Recommendation Scoring Engine (S1–S6)
+
+Products are ranked by a weighted composite score (0–999.99) from 6 signals:
+
+| Signal | Range | Description |
+|--------|-------|-------------|
+| S1 | 0–300 | Rule Match Priority — base priority from rule-based matching (face_shape, skin_tone, undertone, personal_color, gender) |
+| S2 | 0–300 | CIEDE2000 Proximity — closeness of product color shades to palette best_colors |
+| S3 | 0–150 | Seasonal Match — bonus for matching user's personal color season (150=match, 0=mismatch, 75=no data) |
+| S4 | -100–0 | Avoid-Color Penalty — deduction when product shade close to avoid-color (delta E < 15) |
+| S5 | 0–100 | Feedback Aggregation — like/dislike ratio from users with same personal color |
+| S6 | 0–50 | Popularity — favorites count (capped at 10 favorites = 50 points) |
+
+Final Score = clamp(S1 + S2 + S3 + S4 + S5 + S6, 0, 999.99)
+
+Implementation: services/scoring_service.py. Tests: tests/test_scoring_service.py (35 tests).
+
+### Product Comparison
+- Maximum 3 products per comparison
+- Color Match % = clamp((S2 + S4) / 300 × 100, 0, 100)
+- Comparison table includes: name, brand, price, category, suitability, description, purchase links, color match %, face shape tips
+- All labels in Thai language
+- Face shape tips from FACE_SHAPE_TIPS_TH (Thai translations)
+
+---
+
+## 7. Product Color Data Pipeline
+
+### Methodology
+Colors are extracted from real product swatch images using K-Means clustering in CIELAB color space.
+
+Reference: Griffen, A., Bailey, J., & Whaley, R. (2018). "Beauty Brawl", The Pudding. https://pudding.cool/2018/06/makeup-shades/
+
+### Pipeline Steps (scripts/)
+1. **download_swatches.py** — Downloads swatch images from official/retailer websites (Shopify CDN, Temptalia, beauty blogs)
+2. **extract_product_colors.py** — Processes swatch images:
+   - Load image, crop 15% margins (remove background)
+   - K-Means clustering (5 clusters) in CIELAB space → dominant color
+   - Classify tone via ITA (Chardon et al. 1991)
+   - Classify undertone via hue angle (Xiao et al. 2017)
+   - Generate shade_code: {tone}_{undertone} (e.g. "fair_cool", "medium_warm")
+   - Export INSERT SQL with subquery product lookup
+3. **seed_data.py** — Generates recommendation_rules from product_color_shades using shade_code
+
+### Image Sources (115 swatch images)
+- Romand: romandbeauty.com Shopify CDN (via .json API)
+- Canmake: canmakeusa.com Shopify CDN, TokTokBeauty.com Shopify CDN
+- 3CE: Lamcy Korea Shopify CDN (lamcy-kr.com)
+- MAC: Temptalia.com, soundlysensiblebeauty blog
+- Maybelline: Temptalia.com, makeupandbeautyforever blog, Nouveau Cheap blog
+- Mistine: BigxShow Shopify CDN, Mistine official website
+- Canmake Glow Fleur: alittledabintomakeup blog, Momoko Cosmetics Shopify CDN
+
+### Color Conversion Path
+sRGB [0-255] → normalize [0-1] → XYZ (D65 illuminant) → CIELAB (L*a*b*)
+Using colour-science library: colour.sRGB_to_XYZ() → colour.XYZ_to_Lab()
+
+---
+
+## 8. Product Catalog (19 products across 5 categories)
+
+### ลิปสติก (Lipstick) — category_id = 1
+1. Maybelline Super Stay Vinyl Ink Lipstick — ฿350
+2. MAC M·A·Cximal Silky Matte Lipstick — ฿1,100
+3. Romand Juicy Lasting Tint — ฿350
+4. 3CE Velvet Lip Tint — ฿590
+
+### รองพื้น (Foundation) — category_id = 2
+5. Maybelline Fit Me Matte + Poreless Foundation — ฿299
+6. MAC Studio Fix Fluid SPF 15 Foundation — ฿1,500
+7. Canmake Marshmallow Finish Powder — ฿550
+8. Mistine Wings Extra Cover Super Powder — ฿199
+
+### บลัชออน (Blush) — category_id = 3
+9. Canmake Cream Cheek — ฿380
+10. Canmake Powder Cheeks — ฿300
+11. Romand Better Than Cheek — ฿320
+12. Mistine Matte Complete Blush — ฿179
+
+### อายแชโดว์ (Eyeshadow) — category_id = 4
+13. 3CE Multi Eye Color Palette — ฿890
+14. Romand Better Than Palette — ฿590
+15. Maybelline The Nudes Eyeshadow Palette — ฿499
+16. Canmake Perfect Stylist Eyes — ฿450
+
+### ไฮไลท์ (Highlighter) — category_id = 5
+17. Canmake Munyutto Highlighter — ฿300
+18. Canmake Glow Fleur Highlighter — ฿380
+19. Mistine Wings Extra Cover Highlighter — ฿179
+
+### Brands (6)
+Maybelline, MAC, Romand, 3CE, Canmake, Mistine
+
+### Product Color Shades
+114 shade entries extracted from real swatch images.
+Distribution by skin tone: fair (64), light (12), medium (7), tan (9), dark (12), deep (10)
+Distribution by undertone: cool (64), neutral (30), warm (20)
+Each shade has: shade_name, shade_code ({tone}_{undertone}), hex_color (#RRGGBB)
+
+---
+
+## 9. Backend Services Detail
+
+### ai_service.py — Face Analysis Orchestrator
+- analyze_face(image_path, gender, db_session): Main entry point
+- detect_face_shape(rgb_image, facemesh_data): CNN + geometry fallback
+- detect_skin_tone(rgb_image): Returns (tone, undertone)
+- get_personal_color(skin_tone, undertone, skin_lab, db_session): Season classification
+- _run_facemesh(rgb_image): Single MediaPipe pass
+- FACE_SHAPE_TIPS: Dict with contouring & style advice per shape
+
+### color_analysis_service.py — CIELAB Color Science
+- rgb_to_lab(rgb_pixels): RGB→CIELAB via sRGB→XYZ→Lab
+- extract_skin_lab(rgb_image): K-Means on center region
+- extract_skin_lab_from_bbox(rgb_image, bbox): K-Means on cheek region with outlier filtering
+- classify_tone_from_lab(L, b): ITA formula → 6 tone classes
+- classify_undertone_from_lab(a, b): hue angle → warm/cool/neutral
+- load_palette_references(db_session): Cache palette centroids
+- match_season_by_delta_e(skin_lab, palette_refs): CIEDE2000 matching
+
+### scoring_service.py — 6-Signal Scoring
+- hex_to_lab(hex_color): Cached hex→CIELAB conversion
+- compute_color_proximity(shades_lab, palette_lab): S2 score
+- compute_avoid_penalty(shades_lab, avoid_lab): S4 score
+- compute_personal_color_score(product_pc, analysis_pc): S3 score
+- compute_final_score(s1-s6): Combine and clamp
+- batch_feedback_scores(product_ids, personal_color, db): S5 batch query
+- batch_popularity_scores(product_ids, db): S6 batch query
+
+### recommendation_service.py — TF-IDF Similarity
+- tokenize(text): Regex tokenization (English + Thai)
+- build_document(product): Weighted product text representation
+- compute_tf/idf/tfidf: TF-IDF vector computation
+- cosine_similarity(vec_a, vec_b): Vector similarity
+- get_similar_products(target, all, top_n): Find similar products
+
+### gemini_service.py — AI Chat
+- generate_with_gemini(prompt, image_path): Gemini-2.0-flash-exp API call
+
+### landmark_service.py — Face Landmarks
+- detect_landmarks(image_path): dlib 68-point detection
+
+---
+
+## 10. Frontend Pages
+
+### Home (/)
+Hero landing page with parallax effects, 3D tilt cards, animated face analysis overlay, color season cards, product showcase, customer reviews, how-it-works walkthrough.
+
+### Login (/login) & Register (/register)
+JWT-based authentication. Login redirects admins to /admin, users to /. Registration creates account with auto-generated profile.
+
+### Analyze (/analyze)
+Upload face image → select gender → AI analysis → displays:
+- Personal color badge (season)
+- Face shape with confidence bar
+- Skin tone and undertone
+- Face shape tips
+- Color palette (best colors)
+- Product recommendations with platform links (Shopee, TikTok, Lazada)
+
+### Products (/products)
+Product catalog with:
+- Search, category/brand/season filters, sorting (newest, price)
+- Product cards with brand, price, personal color badges
+- Similar products modal (TF-IDF cosine similarity)
+- Compare modal (max 3 products) with color match % and face shape tips
+- Floating compare bar
+- Commission click tracking
+
+### Gemini Chat (/gemini)
+Multi-message AI chat with image upload. Creates session on first message. User/AI bubbles with image support.
+
+### Photo Editor (/editor)
+Real-time makeup try-on: lips, eyes, eyeliner, eyebrows, lashes, nose, blush, highlight, foundation. 8 image filters. Save looks by category (morning, night, party, work, Korean, natural).
+
+### Profile (/profile)
+User info card, edit form (name, bio, gender, nationality), analysis history grid with per-analysis cards showing season badge, face shape, tone, undertone, confidence.
+
+### Admin (/admin)
+Commission dashboard with stat cards, click/commission breakdown by platform.
+
+---
+
+## 11. Frontend Architecture
+
+### Routing (App.jsx)
+/ → Home, /login → Login, /register → Register, /analyze → Analyze, /products → Products, /gemini → GeminiChat, /editor → PhotoEditor, /profile → Profile, /admin → AdminDashboard
+
+### Auth (AuthContext.jsx)
+React Context API storing JWT in localStorage. Provides user state, login/logout functions to all components.
+
+### API Client (axios.js)
+Configured Axios instance: baseURL prepends /api, interceptor injects Authorization: Bearer {token}.
+
+### Behavior Tracking (tracker.js)
+Tracks: product_view, search, filter, click, similar_view, makeup_select, preset_apply events with page context.
+
+---
+
+## 12. Data Flow Summary
+
+1. User uploads face photo → POST /analysis/
+2. Backend runs MediaPipe FaceMesh (single pass) → face shape + skin extraction
+3. CIELAB color science classifies tone (ITA), undertone (hue angle), season (CIEDE2000)
+4. 6-signal scoring engine ranks matching products
+5. Enriched response returns: analysis + palette + tips + recommendations
+6. User browses products, compares, clicks affiliate links
+7. Commission tracking logs clicks by platform
+8. Photo editor allows virtual makeup try-on
+9. Gemini AI chat provides beauty advice
+10. Behavior analytics tracks all user interactions
+
+---
+
+## 13. Seed Data Pipeline (execution order)
+
+1. auramatch.sql — Create all 37 tables, seed product_categories (7) and initial data
+2. seed_makeup_products.sql — Insert 6 brands, 19 products, product links
+3. seed_personal_color.sql — Map products to personal color seasons
+4. seed_product_color_shades.sql — Insert 114 product color shades (extracted from real swatches)
+5. seed_product_concerns.sql — Map products to skin concerns
+6. python scripts/seed_color_palettes.py — Seed 12-season palette reference data with Lab* centroids
+7. python scripts/seed_data.py — Generate recommendation_rules from shade_code data
+
+---
+
+## 14. Color Extraction Science
+
+### K-Means + CIELAB Methodology
+Product colors are extracted from real swatch images, NOT estimated or made up.
+
+1. Load swatch image → crop 15% margins (remove white/black backgrounds)
+2. Convert all pixels: sRGB → XYZ (D65) → CIELAB
+3. Filter extreme values: L* < 15 or L* > 95 (background remnants)
+4. K-Means clustering (5 clusters, 10 initializations) → find largest cluster
+5. Cluster centroid = dominant product color in L*a*b*
+
+### Tone Classification (ITA)
+ITA = arctan((L* - 50) / b*) × (180/π)
+| ITA Range | Classification |
+|-----------|---------------|
+| > 55° | fair (Very Light) |
+| > 41° | light (Light) |
+| > 28° | medium (Intermediate) |
+| > 10° | tan (Tan/Mat) |
+| > -30° | dark (Brown) |
+| ≤ -30° | deep (Dark) |
+
+Reference: Chardon, A., Cretois, I., & Hourseau, C. (1991). Skin colour typology and suntanning pathways. Int J Cosmet Sci, 13(4), 191-208.
+
+### Undertone Classification (Hue Angle)
+h_ab = atan2(b*, a*) in degrees [0, 360)
+| Hue Angle | Classification |
+|-----------|---------------|
+| > 65° | warm (yellow-dominant) |
+| < 50° | cool (red/pink-dominant) |
+| 50–65° | neutral |
+
+Reference: Xiao, K., et al. (2017). Characterising the variations in ethnic skin colours. Skin Res Technol, 23(1), 21-29.
+
+### Color Distance (CIEDE2000)
+For matching user's skin to palette centroids and product shades.
+Reference: Sharma, G., Wu, W., & Dalal, E. N. (2005). The CIEDE2000 color-difference formula. Color Research & Application, 30(1), 21-30.
+
+---
+
+## 15. Testing
+
+### Test Suite (112 test functions)
+- tests/test_color_analysis_service.py — Color science (CIELAB, ITA, hue angle, CIEDE2000)
+- tests/test_face_shape_decision_tree.py — Face shape thresholds (39 characterization tests, locked to Farkas 1994)
+- tests/test_scoring_service.py — 6-signal scoring engine
+
+Run: python3 -m pytest tests/ -v
+
+---
+
+## 16. Scripts
+
+| Script | Purpose |
+|--------|---------|
+| download_swatches.py | Download swatch images from official/retailer URLs |
+| extract_product_colors.py | K-Means + CIELAB → dominant color → SQL INSERT |
+| import_all_makeup.py | Import cosmetic data from 5 CSV files (6,816+ rows) |
+| import_makeup_data.py | Import foundation shades from archive |
+| seed_color_palettes.py | Seed 12-season personal color palettes with Lab* centroids |
+| seed_data.py | Generate recommendation_rules + demo users |
+| train_face_shape.py | Train CNN model for 7 face shape classifications |
+| face-shape-finder.ipynb | Jupyter notebook for face shape analysis |
+
+---
+
+## 17. Key Academic References
+
+1. **Farkas, L. G. (1994).** Anthropometry of the Head and Face (2nd ed.). Raven Press. — Face shape geometry thresholds.
+2. **Farkas, L. G., et al. (1985).** Vertical and horizontal proportions of the face. Plast Reconstr Surg, 75(3), 328-338.
+3. **Chardon, A., Cretois, I., & Hourseau, C. (1991).** Skin colour typology and suntanning pathways. Int J Cosmet Sci, 13(4), 191-208. — ITA skin tone classification.
+4. **Del Bino, S. & Bernerd, F. (2013).** Variations in skin colour and the biological consequences of ultraviolet radiation exposure. Br J Dermatol, 169(s3), 33-40. — ITA thresholds.
+5. **Xiao, K., et al. (2017).** Characterising the variations in ethnic skin colours. Skin Res Technol, 23(1), 21-29. — Hue angle undertone classification.
+6. **Ly, B. C. K., et al. (2020).** Research Techniques Made Simple: Cutaneous Colorimetry. J Invest Dermatol, 140(1), 3-12.e1. — Skin colorimetry overview.
+7. **Sharma, G., Wu, W., & Dalal, E. N. (2005).** The CIEDE2000 color-difference formula. Color Research & Application, 30(1), 21-30. — CIEDE2000 color distance.
+8. **Griffen, A., Bailey, J., & Whaley, R. (2018).** "Beauty Brawl", The Pudding. https://pudding.cool/2018/06/makeup-shades/ — K-Means swatch extraction methodology.
+
+---
+
+## 18. Development Commands
+
+### Frontend (frontendauramatchnewversion/)
+npm run dev        # Dev server on port 5175
+npm run build      # Production build
+npm run lint       # ESLint
+
+### Backend (backendauramatchnewversion/)
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
+python3 -m pytest tests/ -v
+
+### Database
+mysql -u root -p < auramatch.sql
+mysql -u root -p auramatchnewversion < seed_makeup_products.sql
+mysql -u root -p auramatchnewversion < seed_personal_color.sql
+mysql -u root -p auramatchnewversion < seed_product_color_shades.sql
+cd backendauramatchnewversion && python3 scripts/seed_color_palettes.py
+cd backendauramatchnewversion && python3 scripts/seed_data.py

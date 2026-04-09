@@ -1,0 +1,74 @@
+@startuml ER01_User_Auth
+!theme plain
+skinparam linetype ortho
+skinparam dpi 150
+skinparam entity {
+    BackgroundColor #D6EEFF
+    BorderColor #2C2C2C
+    FontSize 13
+    AttributeFontSize 11
+}
+
+title **ER Diagram กลุ่มที่ 1: User & Authentication**\n//การแปลง Class → Table: ผู้ใช้งานและการยืนยันตัวตน//
+
+entity "users" as users {
+    * **user_id** : INT <<PK, AI>>
+    --
+    * username : VARCHAR(50) <<UK, NN>>
+    * email : VARCHAR(100) <<UK, NN>>
+    * password_hash : VARCHAR(255) <<NN>>
+    role : ENUM('admin','user') = 'user'
+    is_active : INT = 1
+    created_at : DATETIME = NOW()
+}
+
+entity "user_profiles" as user_profiles {
+    * **profile_id** : INT <<PK, AI>>
+    --
+    * //user_id// : INT <<FK, UK, NN>>
+    first_name : VARCHAR(100)
+    last_name : VARCHAR(100)
+    display_name : VARCHAR(100)
+    avatar_url : VARCHAR(255)
+    birth_date : DATE
+    gender : ENUM('female','male',\n  'non_binary','prefer_not_to_say')
+    nationality : VARCHAR(100)
+    bio : TEXT
+    updated_at : DATETIME
+}
+
+entity "password_resets" as password_resets {
+    * **reset_id** : INT <<PK, AI>>
+    --
+    * //user_id// : INT <<FK, NN>>
+    * token : VARCHAR(255) <<UK, NN>>
+    * expires_at : DATETIME <<NN>>
+    created_at : DATETIME = NOW()
+}
+
+note bottom of users
+  <b>Class → Table Mapping</b>
+  Python: <b>User</b> (models/user.py)
+  Table: <b>users</b>
+  ศูนย์กลางของระบบ
+  มี FK จาก 16 ตารางอื่น
+end note
+
+note bottom of user_profiles
+  <b>Class → Table Mapping</b>
+  Python: <b>UserProfile</b> (models/misc.py)
+  Table: <b>user_profiles</b>
+  1:1 กับ users (UK on user_id)
+end note
+
+note bottom of password_resets
+  <b>Class → Table Mapping</b>
+  Python: <b>PasswordReset</b> (models/misc.py)
+  Table: <b>password_resets</b>
+  Token มี expiry, ON DELETE CASCADE
+end note
+
+users ||--|| user_profiles : "1:1\nhas profile"
+users ||--o{ password_resets : "1:N\nrequests reset"
+
+@enduml

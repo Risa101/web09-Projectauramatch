@@ -1,0 +1,430 @@
+erDiagram
+    %% ============================
+    %% AuraMatch ER Diagram
+    %% Class-to-Table Mapping (23 Tables)
+    %% ============================
+
+    %% ─── User Domain ───
+    users {
+        int user_id PK
+        varchar username UK
+        varchar email UK
+        varchar password_hash
+        enum role "admin | user"
+        int is_active "default 1"
+        datetime created_at
+    }
+
+    user_profiles {
+        int profile_id PK
+        int user_id FK, UK
+        varchar first_name
+        varchar last_name
+        varchar display_name
+        varchar avatar_url
+        date birth_date
+        enum gender "female | male | non_binary | prefer_not_to_say"
+        varchar nationality
+        text bio
+        datetime updated_at
+    }
+
+    password_resets {
+        int reset_id PK
+        int user_id FK
+        varchar token UK
+        datetime expires_at
+        datetime created_at
+    }
+
+    %% ─── Product Domain ───
+    brands {
+        int brand_id PK
+        varchar name
+        varchar logo_url
+        varchar website_url
+        text description
+        int is_active "default 1"
+        datetime created_at
+    }
+
+    product_categories {
+        int category_id PK
+        varchar name
+        text description
+        varchar icon_url
+    }
+
+    products {
+        int product_id PK
+        int brand_id FK "nullable"
+        int category_id FK "nullable"
+        varchar name
+        text description
+        decimal price "10,2"
+        varchar image_url
+        varchar personal_color "comma-separated seasons"
+        decimal commission_rate "5,2"
+        int is_active "default 1"
+        datetime created_at
+    }
+
+    product_links {
+        int link_id PK
+        int product_id FK
+        enum platform "shopee | tiktok | lazada | sephora | watsons | ulta"
+        varchar url
+        int is_active "default 1"
+        datetime created_at
+    }
+
+    product_color_shades {
+        int shade_id PK
+        int product_id FK
+        varchar shade_name
+        varchar shade_code
+        varchar hex_color "7 chars"
+        varchar image_url
+        int is_active "default 1"
+    }
+
+    product_tags {
+        int tag_id PK
+        varchar name UK
+    }
+
+    product_tag_map {
+        int id PK
+        int product_id FK
+        int tag_id FK
+    }
+
+    %% ─── Analysis Domain ───
+    color_palettes {
+        int palette_id PK
+        enum season "spring | summer | autumn | winter"
+        varchar sub_type
+        text description
+        json best_colors "CIELAB format"
+        json avoid_colors "CIELAB format"
+        text makeup_tips
+        datetime created_at
+    }
+
+    analysis_results {
+        int analysis_id PK
+        int user_id FK
+        varchar image_path
+        enum gender "female | male | non_binary"
+        enum ethnicity "asian | caucasian | african | ..."
+        varchar nationality
+        enum face_shape "oval | round | square | heart | oblong | diamond | triangle"
+        enum skin_tone "fair | light | medium | tan | dark | deep"
+        enum skin_undertone "warm | cool | neutral"
+        enum personal_color "spring | summer | autumn | winter"
+        int palette_id FK "nullable"
+        decimal confidence_score "5,2"
+        datetime created_at
+    }
+
+    analysis_reviews {
+        int review_id PK
+        int analysis_id FK
+        int user_id FK
+        int is_accurate
+        text comment
+        datetime created_at
+    }
+
+    %% ─── Recommendation Domain ───
+    recommendation_rules {
+        int rule_id PK
+        int product_id FK
+        enum face_shape "oval | ... | any"
+        enum skin_tone "fair | ... | any"
+        enum skin_undertone "warm | cool | neutral | any"
+        enum personal_color "spring | ... | any"
+        enum gender "female | male | any"
+        enum ethnicity "asian | ... | any"
+        int priority "default 0"
+    }
+
+    recommendations {
+        int recommendation_id PK
+        int analysis_id FK
+        int product_id FK
+        decimal score "5,2"
+        datetime created_at
+    }
+
+    recommendation_feedback {
+        int feedback_id PK
+        int recommendation_id FK
+        int user_id FK
+        enum rating "like | dislike"
+        datetime created_at
+    }
+
+    favorites {
+        int favorite_id PK
+        int user_id FK
+        int product_id FK
+        datetime created_at
+    }
+
+    %% ─── Skin Concern Domain ───
+    skin_concerns {
+        int concern_id PK
+        varchar name
+        text description
+        varchar icon_url
+    }
+
+    user_skin_concerns {
+        int id PK
+        int user_id FK
+        int concern_id FK
+        enum severity "mild | moderate | severe"
+        datetime created_at
+    }
+
+    product_concerns {
+        int id PK
+        int product_id FK
+        int concern_id FK
+    }
+
+    %% ─── Commerce Domain ───
+    click_logs {
+        int log_id PK
+        int link_id FK
+        int user_id FK "nullable"
+        enum platform "shopee | tiktok | lazada"
+        varchar ip_address
+        text user_agent
+        datetime clicked_at
+    }
+
+    commissions {
+        int commission_id PK
+        int link_id FK
+        int user_id FK "nullable"
+        enum platform "shopee | tiktok | lazada"
+        decimal amount "10,2"
+        enum status "pending | confirmed | paid"
+        datetime clicked_at
+    }
+
+    %% ─── Product Review ───
+    product_reviews {
+        int review_id PK
+        int product_id FK
+        int user_id FK
+        int rating
+        text comment
+        varchar image_url
+        enum platform "shopee | tiktok | lazada | other"
+        int is_verified "default 0"
+        datetime created_at
+    }
+
+    %% ─── Gemini AI Chat ───
+    gemini_sessions {
+        int session_id PK
+        int user_id FK
+        int analysis_id FK "nullable"
+        varchar title
+        datetime created_at
+    }
+
+    gemini_messages {
+        int message_id PK
+        int session_id FK
+        enum role "user | model"
+        text prompt
+        text response
+        varchar image_input
+        varchar image_output
+        datetime created_at
+    }
+
+    %% ─── Photo Editor Domain ───
+    edit_filters {
+        int filter_id PK
+        varchar name
+        enum category "beauty | color | light | vintage | makeup"
+        varchar thumbnail_url
+        json config
+        int is_active "default 1"
+        datetime created_at
+    }
+
+    edit_stickers {
+        int sticker_id PK
+        varchar name
+        enum category "face | decoration | text | emoji"
+        varchar image_url
+        int is_active "default 1"
+        datetime created_at
+    }
+
+    photo_edits {
+        int edit_id PK
+        int user_id FK
+        varchar original_image
+        varchar edited_image
+        json edit_config
+        enum source "upload | analysis | gemini"
+        datetime created_at
+    }
+
+    saved_looks {
+        int look_id PK
+        int user_id FK
+        varchar name
+        varchar category
+        json makeup_data
+        json filter_data
+        varchar thumbnail_url
+        datetime created_at
+    }
+
+    %% ─── Blog Domain ───
+    blog_categories {
+        int category_id PK
+        varchar name
+        text description
+        datetime created_at
+    }
+
+    blog_posts {
+        int post_id PK
+        int category_id FK "nullable"
+        int author_id FK
+        varchar title
+        varchar slug UK
+        text content
+        varchar thumbnail_url
+        int views "default 0"
+        int is_published "default 0"
+        datetime published_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% ─── Misc ───
+    notifications {
+        int notification_id PK
+        int user_id FK
+        varchar title
+        text message
+        enum type "recommendation | promotion | system | review"
+        int is_read "default 0"
+        datetime created_at
+    }
+
+    banners {
+        int banner_id PK
+        varchar title
+        varchar image_url
+        varchar link_url
+        enum position "home_top | home_middle | sidebar"
+        datetime starts_at
+        datetime ends_at
+        int is_active "default 1"
+        datetime created_at
+    }
+
+    search_history {
+        int search_id PK
+        int user_id FK "nullable"
+        varchar keyword
+        datetime created_at
+    }
+
+    admin_logs {
+        int log_id PK
+        int admin_id FK
+        varchar action
+        varchar table_name
+        int record_id
+        json old_value
+        json new_value
+        varchar ip_address
+        datetime created_at
+    }
+
+    user_behaviors {
+        int id PK
+        int user_id FK "nullable"
+        varchar session_id
+        varchar event_type
+        json event_data
+        varchar page
+        datetime created_at
+    }
+
+    %% ============================
+    %% Relationships
+    %% ============================
+
+    %% User 1-to-1
+    users ||--o| user_profiles : "has profile"
+    users ||--o{ password_resets : "requests reset"
+
+    %% User 1-to-many
+    users ||--o{ analysis_results : "uploads for analysis"
+    users ||--o{ favorites : "saves favorite"
+    users ||--o{ notifications : "receives"
+    users ||--o{ gemini_sessions : "chats with AI"
+    users ||--o{ blog_posts : "authors"
+    users ||--o{ photo_edits : "edits photos"
+    users ||--o{ product_reviews : "writes review"
+    users ||--o{ recommendation_feedback : "gives feedback"
+    users ||--o{ search_history : "searches"
+    users ||--o{ saved_looks : "saves look"
+    users ||--o{ user_skin_concerns : "has concern"
+    users ||--o{ admin_logs : "admin actions"
+    users ||--o{ user_behaviors : "tracked behavior"
+    users ||--o{ analysis_reviews : "reviews analysis"
+
+    %% Product hierarchy
+    brands ||--o{ products : "owns"
+    product_categories ||--o{ products : "categorizes"
+
+    %% Product details
+    products ||--o{ product_links : "sold on"
+    products ||--o{ product_color_shades : "has shades"
+    products ||--o{ product_tag_map : "tagged with"
+    product_tags ||--o{ product_tag_map : "applied to"
+    products ||--o{ product_reviews : "reviewed"
+    products ||--o{ favorites : "favorited"
+    products ||--o{ recommendation_rules : "matched by rule"
+    products ||--o{ recommendations : "recommended"
+    products ||--o{ product_concerns : "addresses"
+
+    %% Analysis relationships
+    color_palettes ||--o{ analysis_results : "assigned palette"
+    analysis_results ||--o{ recommendations : "generates"
+    analysis_results ||--o{ analysis_reviews : "reviewed by user"
+
+    %% Recommendation chain
+    recommendations ||--o{ recommendation_feedback : "rated"
+
+    %% Commerce chain
+    product_links ||--o{ click_logs : "clicked"
+    product_links ||--o{ commissions : "earns"
+
+    %% Gemini chat
+    gemini_sessions ||--o{ gemini_messages : "contains"
+
+    %% Blog
+    blog_categories ||--o{ blog_posts : "groups"
+
+    %% Skin concerns
+    skin_concerns ||--o{ user_skin_concerns : "reported by"
+    skin_concerns ||--o{ product_concerns : "treated by"
+
+    %% Commerce user links (nullable)
+    users ||--o{ click_logs : "clicks"
+    users ||--o{ commissions : "earns"

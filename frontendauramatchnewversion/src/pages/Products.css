@@ -150,6 +150,31 @@
   letter-spacing: .03em; 
 }
 
+/* ── Favorite Heart Button ── */
+.pd-fav-btn {
+  position: absolute; top: .55rem; right: .55rem;
+  width: 2rem; height: 2rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.85); backdrop-filter: blur(4px);
+  border: none; cursor: pointer;
+  color: var(--pd-warm-gray);
+  transition: var(--pd-transition);
+  z-index: 2;
+}
+.pd-fav-btn:hover {
+  background: rgba(255,255,255,.95);
+  color: var(--pd-rose);
+  transform: scale(1.1);
+}
+.pd-fav-btn--active {
+  color: var(--pd-rose-deep);
+  background: var(--pd-rose-light);
+}
+.pd-fav-btn--active:hover {
+  color: var(--pd-rose-deep);
+  background: var(--pd-rose-light);
+}
+
 /* ── Card Body ── */
 .pd-card-body { padding: .7rem; }
 .pd-card-brand {
@@ -171,6 +196,22 @@
 /* ── Personal Color Badges ── */
 .pd-card-seasons { display: flex; gap: .15rem; margin-bottom: .3rem; }
 .pd-season-dot { font-size: .72rem; cursor: default; }
+
+/* ── Concern Badges ── */
+.pd-card-concerns { display: flex; flex-wrap: wrap; gap: .25rem; margin-bottom: .35rem; }
+.pd-concern-badge {
+  display: inline-flex; align-items: center; gap: .2rem;
+  padding: .15rem .5rem; border-radius: 9999px;
+  font-family: var(--pd-body); font-size: .68rem; font-weight: 500;
+  background: var(--pd-light-gray); color: var(--pd-warm-gray);
+  border: 1px solid var(--pd-border);
+}
+.pd-concern-badge--match {
+  background: linear-gradient(135deg, #ede9fe, #fdf2f8);
+  color: #7c3aed;
+  border-color: #c4b5fd;
+  font-weight: 600;
+}
 
 /* ── Card Actions ── */
 .pd-card-actions { display: flex; flex-direction: column; gap: .3rem; margin-top: .2rem; }
@@ -324,6 +365,33 @@
   padding: .1rem .35rem; border-radius: 9999px; background: var(--pd-light-gray);
 }
 
+/* ── Color Match Bar ── */
+.pd-compare-match { display: flex; flex-direction: column; align-items: center; gap: .25rem; }
+.pd-compare-match-bar {
+  width: 100%; max-width: 5rem; height: .35rem;
+  background: var(--pd-light-gray); border-radius: 9999px; overflow: hidden;
+}
+.pd-compare-match-fill {
+  height: 100%; border-radius: 9999px;
+  transition: width .5s cubic-bezier(.4,0,.2,1);
+}
+.pd-compare-match-pct {
+  font-family: var(--pd-display); font-size: .9rem; font-weight: 700;
+  color: var(--pd-charcoal);
+}
+.pd-compare-loading-text { font-size: .68rem; color: var(--pd-warm-gray); }
+.pd-compare-no-data { font-size: .68rem; color: var(--pd-warm-gray); font-style: italic; }
+
+/* ── Face Shape Tips ── */
+.pd-compare-val--tips { text-align: left; }
+.pd-compare-tips { display: flex; flex-direction: column; gap: .15rem; }
+.pd-compare-tips-shape {
+  font-family: var(--pd-display); font-size: .72rem; font-weight: 600;
+  color: var(--pd-gold); text-transform: none;
+}
+.pd-compare-tips-contour { font-size: .68rem; color: var(--pd-charcoal); }
+.pd-compare-tips-styles { font-size: .65rem; color: var(--pd-warm-gray); }
+
 /* ── Empty ── */
 .pd-empty { text-align: center; padding: 5rem 1.5rem; }
 .pd-empty-icon {
@@ -393,4 +461,295 @@
 @media (min-width: 1280px) {
   .pd-grid { grid-template-columns: repeat(5, 1fr); }
   .pd-card-img { aspect-ratio: 3/4; }
+}
+
+/* ── Product Detail + Review Modal ───────────────────────────────── */
+
+.pd-detail-modal {
+  background: #fff;
+  border-radius: 1rem;
+  max-width: 36rem;
+  width: 92vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+  animation: pdSlideUp .3s ease;
+}
+
+.pd-detail-header {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--pd-light-gray);
+  margin-bottom: 1rem;
+}
+
+.pd-detail-img {
+  width: 6rem;
+  height: 7.5rem;
+  object-fit: cover;
+  border-radius: .5rem;
+  flex-shrink: 0;
+}
+
+.pd-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  min-width: 0;
+}
+
+.pd-detail-name {
+  font-family: var(--pd-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--pd-charcoal);
+  margin: 0;
+}
+
+.pd-detail-price {
+  font-family: var(--pd-display);
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--pd-gold);
+}
+
+/* Review Summary */
+.pd-review-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  padding: 2rem;
+  color: var(--pd-warm-gray);
+  font-size: .85rem;
+}
+
+.pd-review-summary {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--pd-light-gray);
+  margin-bottom: 1rem;
+}
+
+.pd-review-avg-section {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .75rem;
+}
+
+.pd-review-avg {
+  font-family: var(--pd-display);
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--pd-charcoal);
+  line-height: 1;
+}
+
+.pd-review-avg-detail {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+
+.pd-review-stars {
+  display: flex;
+  gap: .1rem;
+}
+
+.pd-review-star--filled { color: var(--pd-gold); }
+.pd-review-star--empty { color: #d4d0cc; }
+
+.pd-review-total {
+  font-size: .75rem;
+  color: var(--pd-warm-gray);
+}
+
+/* Distribution */
+.pd-review-dist {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+
+.pd-review-dist-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.pd-review-dist-label {
+  font-size: .7rem;
+  color: var(--pd-warm-gray);
+  width: .75rem;
+  text-align: right;
+}
+
+.pd-review-dist-bar {
+  flex: 1;
+  height: .35rem;
+  background: var(--pd-light-gray);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.pd-review-dist-fill {
+  height: 100%;
+  background: var(--pd-gold);
+  border-radius: 1rem;
+  transition: width .4s ease;
+}
+
+.pd-review-dist-count {
+  font-size: .65rem;
+  color: var(--pd-warm-gray);
+  width: 1.5rem;
+}
+
+/* Review Form */
+.pd-review-form {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--pd-light-gray);
+  margin-bottom: 1rem;
+}
+
+.pd-review-form-title {
+  font-family: var(--pd-display);
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--pd-charcoal);
+  margin: 0 0 .5rem;
+}
+
+.pd-review-form-stars {
+  display: flex;
+  gap: .15rem;
+  margin-bottom: .5rem;
+}
+
+.pd-review-star-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: .15rem;
+  transition: transform .15s ease;
+}
+
+.pd-review-star-btn:hover {
+  transform: scale(1.2);
+}
+
+.pd-review-textarea {
+  width: 100%;
+  font-family: var(--pd-body);
+  font-size: .8rem;
+  padding: .6rem .75rem;
+  border: 1px solid #e8e4e0;
+  border-radius: .5rem;
+  resize: vertical;
+  outline: none;
+  transition: border-color .2s;
+  box-sizing: border-box;
+}
+
+.pd-review-textarea:focus {
+  border-color: var(--pd-gold);
+}
+
+.pd-review-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin-top: .5rem;
+  padding: .45rem 1.1rem;
+  background: var(--pd-charcoal);
+  color: #fff;
+  border: none;
+  border-radius: 2rem;
+  font-family: var(--pd-body);
+  font-size: .78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .2s, opacity .2s;
+}
+
+.pd-review-submit:hover { background: #1a1714; }
+.pd-review-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Review List */
+.pd-review-list {
+  max-height: 24rem;
+  overflow-y: auto;
+  padding-right: .25rem;
+}
+
+.pd-review-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+  padding: 2rem;
+  color: var(--pd-warm-gray);
+  font-size: .85rem;
+}
+
+.pd-review-item {
+  padding: .75rem 0;
+  border-bottom: 1px solid #f0ece8;
+}
+
+.pd-review-item:last-child { border-bottom: none; }
+
+.pd-review-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: .25rem;
+}
+
+.pd-review-author {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+}
+
+.pd-review-author-name {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--pd-charcoal);
+}
+
+.pd-review-verified {
+  color: #22c55e;
+}
+
+.pd-review-date {
+  font-size: .68rem;
+  color: var(--pd-warm-gray);
+}
+
+.pd-review-comment {
+  font-size: .78rem;
+  color: #5a534e;
+  margin: .3rem 0 0;
+  line-height: 1.5;
+}
+
+.pd-review-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  margin-top: .35rem;
+  padding: .2rem .5rem;
+  background: none;
+  border: 1px solid #e8e4e0;
+  border-radius: .3rem;
+  font-size: .68rem;
+  color: var(--pd-rose-deep);
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.pd-review-delete:hover {
+  background: #fef2f2;
 }

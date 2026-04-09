@@ -1,0 +1,78 @@
+@startuml ER06_Commerce
+!theme plain
+skinparam linetype ortho
+skinparam dpi 150
+skinparam entity {
+    BackgroundColor #F5F0FF
+    BorderColor #2C2C2C
+    FontSize 13
+    AttributeFontSize 11
+}
+
+title **ER Diagram กลุ่มที่ 6: Commerce & Affiliate**\n//การแปลง Class → Table: ระบบ Affiliate และค่าคอมมิชชั่น//
+
+entity "users" as users <<ref กลุ่ม 1>> #D6EEFF {
+    * **user_id** : INT <<PK>>
+}
+
+entity "products" as products <<ref กลุ่ม 2>> #FFFFF0 {
+    * **product_id** : INT <<PK>>
+}
+
+entity "product_links" as product_links <<ref กลุ่ม 2>> #FFFFF0 {
+    * **link_id** : INT <<PK>>
+    --
+    * //product_id// : INT <<FK>>
+    platform : ENUM
+}
+
+entity "click_logs" as click_logs {
+    * **log_id** : INT <<PK, AI>>
+    --
+    * //link_id// : INT <<FK, NN>>
+    //user_id// : INT <<FK>> SET NULL
+    * platform : ENUM('shopee','tiktok','lazada') <<NN>>
+    ip_address : VARCHAR(45)
+    user_agent : TEXT
+    clicked_at : DATETIME = NOW()
+}
+
+entity "commissions" as commissions {
+    * **commission_id** : INT <<PK, AI>>
+    --
+    * //link_id// : INT <<FK, NN>>
+    //user_id// : INT <<FK>> SET NULL
+    * platform : ENUM('shopee','tiktok','lazada') <<NN>>
+    amount : DECIMAL(10,2)
+    status : ENUM('pending','confirmed','paid') = 'pending'
+    clicked_at : DATETIME = NOW()
+}
+
+entity "product_reviews" as product_reviews {
+    * **review_id** : INT <<PK, AI>>
+    --
+    * //product_id// : INT <<FK, NN>> CASCADE
+    * //user_id// : INT <<FK, NN>> CASCADE
+    * rating : INT <<NN>>
+    comment : TEXT
+    image_url : VARCHAR(255)
+    platform : ENUM('shopee','tiktok','lazada','other')
+    is_verified : INT = 0
+    created_at : DATETIME = NOW()
+}
+
+note right of commissions
+  <b>Class: Commission</b>
+  (models/commission.py)
+  status flow:
+  pending → confirmed → paid
+end note
+
+product_links ||--o{ click_logs : "1:N\nclicked"
+product_links ||--o{ commissions : "1:N\nearns"
+users ||--o{ click_logs : "1:N"
+users ||--o{ commissions : "1:N"
+products ||--o{ product_reviews : "1:N\nreviewed"
+users ||--o{ product_reviews : "1:N\nwrites"
+
+@enduml

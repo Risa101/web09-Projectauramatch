@@ -408,3 +408,32 @@
 .gemini-send-btn--disabled {
   background: #d1d5db;
 }
+
+/* ===== Typing Dots Animation ===== */
+.gemini-typing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #a78bfa;
+  animation: gemini-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.gemini-typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.gemini-typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes gemini-dot-pulse {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

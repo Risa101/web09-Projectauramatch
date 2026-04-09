@@ -1,0 +1,67 @@
+@startuml ER05_SkinConcerns
+!theme plain
+skinparam linetype ortho
+skinparam dpi 150
+skinparam entity {
+    BackgroundColor #FFF8F0
+    BorderColor #2C2C2C
+    FontSize 13
+    AttributeFontSize 11
+}
+
+title **ER Diagram กลุ่มที่ 5: Skin Concerns**\n//การแปลง Class → Table: ปัญหาผิวพรรณ//
+
+entity "users" as users <<ref กลุ่ม 1>> #D6EEFF {
+    * **user_id** : INT <<PK>>
+}
+
+entity "products" as products <<ref กลุ่ม 2>> #FFFFF0 {
+    * **product_id** : INT <<PK>>
+}
+
+entity "skin_concerns" as skin_concerns {
+    * **concern_id** : INT <<PK, AI>>
+    --
+    * name : VARCHAR(100) <<NN>>
+    description : TEXT
+    icon_url : VARCHAR(255)
+}
+
+entity "user_skin_concerns" as user_skin_concerns {
+    * **id** : INT <<PK, AI>>
+    --
+    * //user_id// : INT <<FK, NN>> CASCADE
+    * //concern_id// : INT <<FK, NN>>
+    severity : ENUM('mild','moderate','severe') = 'mild'
+    created_at : DATETIME = NOW()
+}
+
+entity "product_concerns" as product_concerns {
+    * **id** : INT <<PK, AI>>
+    --
+    * //product_id// : INT <<FK, NN>> CASCADE
+    * //concern_id// : INT <<FK, NN>>
+}
+
+note bottom of skin_concerns
+  <b>Class: SkinConcern</b> (models/misc.py)
+  ตารางหลักเก็บรายการปัญหาผิว
+end note
+
+note bottom of user_skin_concerns
+  <b>Junction Table</b>
+  เชื่อม users ↔ skin_concerns (M:N)
+  เพิ่ม severity เป็น attribute ของความสัมพันธ์
+end note
+
+note bottom of product_concerns
+  <b>Junction Table</b>
+  เชื่อม products ↔ skin_concerns (M:N)
+end note
+
+users ||--o{ user_skin_concerns : "1:N"
+skin_concerns ||--o{ user_skin_concerns : "1:N"
+products ||--o{ product_concerns : "1:N"
+skin_concerns ||--o{ product_concerns : "1:N"
+
+@enduml

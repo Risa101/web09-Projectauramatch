@@ -1,0 +1,34 @@
+@startuml SD14_AnalysisHistory
+title SD-14 View Analysis History
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":ProfilePage" as PP
+control ":ProfileController" as PC
+entity ":AnalysisDB" as DB
+
+User -> PP : openPage()
+activate PP
+
+PP -> PC : getAnalyses(token)
+activate PC
+
+PC -> DB : queryAnalyses(user_id)
+activate DB
+DB --> PC : Return analyses[]
+deactivate DB
+
+PC --> PP : Return analyses[]
+deactivate PC
+
+PP --> User : displayAnalysisCards(\nPersonal Color badge,\nface_shape, skin_tone, undertone,\nconfidence_score, timestamp)
+deactivate PP
+
+== alt [no analysis history] ==
+
+PP --> User : displayEmpty("No analysis history")
+
+@enduml

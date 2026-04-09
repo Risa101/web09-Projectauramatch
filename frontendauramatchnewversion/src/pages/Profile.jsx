@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import api from '../api/axios'
-import { User, Mail, Calendar, Save, Loader2, History, Pen, X, Sparkles } from 'lucide-react'
+import api, { skinConcernsApi } from '../api/axios'
+import { User, Mail, Calendar, Save, Loader2, History, Pen, X, Sparkles, ShieldCheck, Check, Heart, Trash2 } from 'lucide-react'
 import './Profile.css'
 
 const FACE_SHAPE_TH = { oval: 'รูปไข่', round: 'กลม', square: 'เหลี่ยม', heart: 'หัวใจ', oblong: 'ยาว', diamond: 'เพชร', triangle: 'สามเหลี่ยม' }
@@ -12,6 +12,11 @@ const SEASON_BAR_CLASS = {
   summer: 'analysis-card__bar--summer',
   autumn: 'analysis-card__bar--autumn',
   winter: 'analysis-card__bar--winter',
+}
+
+const MAKEUP_PART_TH = {
+  lips: 'ลิปสติก', eyes: 'อายแชโดว์', eyeliner: 'อายไลเนอร์', eyebrows: 'คิ้ว',
+  lashes: 'ขนตา', nose: 'นอส', blush: 'บลัช', highlight: 'ไฮไลท์', foundation: 'รองพื้น',
 }
 
 const SEASON_BADGE_CLASS = {
@@ -25,6 +30,7 @@ export default function Profile() {
   const { user } = useAuth()
   const [profile, setProfile] = useState(null)
   const [analyses, setAnalyses] = useState([])
+  const [savedLooks, setSavedLooks] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -37,18 +43,26 @@ export default function Profile() {
     nationality: '',
   })
 
+  // Skin concerns
+  const [allConcerns, setAllConcerns] = useState([])
+  const [myConcernIds, setMyConcernIds] = useState(new Set())
+  const [savingConcerns, setSavingConcerns] = useState(false)
+
   useEffect(() => {
     loadData()
+    loadConcerns()
   }, [])
 
   const loadData = async () => {
     try {
-      const [profileRes, analysesRes] = await Promise.all([
+      const [profileRes, analysesRes, looksRes] = await Promise.all([
         api.get('/profile/'),
         api.get('/profile/analyses'),
+        api.get('/looks/').catch(() => ({ data: [] })),
       ])
       setProfile(profileRes.data)
       setAnalyses(analysesRes.data)
+      setSavedLooks(looksRes.data)
       if (profileRes.data.profile) {
         const p = profileRes.data.profile
         setForm({
@@ -81,6 +95,52 @@ export default function Profile() {
       alert('เกิดข้อผิดพลาด')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const loadConcerns = async () => {
+    try {
+      const [allRes, myRes] = await Promise.all([
+        skinConcernsApi.getAll(),
+        skinConcernsApi.getMine().catch(() => ({ data: [] })),
+      ])
+      setAllConcerns(allRes.data)
+      setMyConcernIds(new Set(myRes.data.map(c => c.concern_id)))
+    } catch {
+      // not logged in or endpoint unavailable
+    }
+  }
+
+  const toggleConcern = (concernId) => {
+    setMyConcernIds(prev => {
+      const next = new Set(prev)
+      if (next.has(concernId)) next.delete(concernId)
+      else next.add(concernId)
+      return next
+    })
+  }
+
+  const deleteLook = async (lookId) => {
+    setSavedLooks(prev => prev.filter(l => l.look_id !== lookId))
+    try {
+      await api.delete(`/looks/${lookId}`)
+    } catch {
+      const res = await api.get('/looks/').catch(() => ({ data: [] }))
+      setSavedLooks(res.data)
+    }
+  }
+
+  const saveConcerns = async () => {
+    setSavingConcerns(true)
+    try {
+      await skinConcernsApi.updateMine(
+        [...myConcernIds].map(id => ({ concern_id: id, severity: 'mild' }))
+      )
+      alert('บันทึกปัญหาผิวสำเร็จ')
+    } catch {
+      alert('เกิดข้อผิดพลาด')
+    } finally {
+      setSavingConcerns(false)
     }
   }
 
@@ -226,6 +286,43 @@ export default function Profile() {
           </div>
         )}
 
+        {/* Skin Concerns Section */}
+        {user && allConcerns.length > 0 && (
+          <div className="profile-card profile-concerns-card">
+            <div className="profile-form__header">
+              <div className="profile-form__header-left">
+                <div className="profile-form__icon-box">
+                  <ShieldCheck size={14} className="profile-form__icon-box-icon" />
+                </div>
+                <div>
+                  <h2 className="profile-form__title">ปัญหาผิวของคุณ</h2>
+                  <p className="profile-concerns__subtitle">เลือกปัญหาผิวเพื่อให้ระบบแนะนำสินค้าที่เหมาะกับคุณ</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="profile-concerns__chips">
+              {allConcerns.map(c => (
+                <button
+                  key={c.concern_id}
+                  className={`profile-concern-chip ${myConcernIds.has(c.concern_id) ? 'profile-concern-chip--active' : ''}`}
+                  onClick={() => toggleConcern(c.concern_id)}
+                >
+                  {myConcernIds.has(c.concern_id) && <Check size={14} />}
+                  {c.name}
+                </button>
+              ))}
+            </div>
+
+            <div className="profile-form__actions">
+              <button onClick={saveConcerns} disabled={savingConcerns} className="profile-save-btn">
+                {savingConcerns ? <Loader2 size={16} className="profile-save-btn__spinner" /> : <Save size={16} />}
+                บันทึก
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Analysis History Section */}
         <div className="profile-history">
           <div className="profile-history__header">
@@ -293,6 +390,71 @@ export default function Profile() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Saved Looks Section */}
+        <div className="profile-history">
+          <div className="profile-history__header">
+            <div className="profile-history__icon-box">
+              <Heart size={18} className="profile-history__icon-box-icon" />
+            </div>
+            <div>
+              <h2 className="profile-history__title">ลุคที่บันทึกไว้</h2>
+              <p className="profile-history__count">
+                {savedLooks.length > 0
+                  ? `ทั้งหมด ${savedLooks.length} ลุค`
+                  : 'ยังไม่มีข้อมูล'}
+              </p>
+            </div>
+          </div>
+
+          {savedLooks.length === 0 ? (
+            <div className="profile-history__empty">
+              <div className="profile-history__empty-icon">
+                <Heart size={28} className="profile-history__empty-icon-svg" />
+              </div>
+              <p className="profile-history__empty-text">ยังไม่มีลุคที่บันทึกไว้</p>
+              <p className="profile-history__empty-subtext">สร้างลุคใน Photo Editor แล้วบันทึกได้เลย</p>
+            </div>
+          ) : (
+            <div className="saved-looks__grid">
+              {savedLooks.map((look) => {
+                const activeParts = Object.entries(look.makeup_data || {})
+                  .filter(([, v]) => v?.color)
+                  .map(([k]) => MAKEUP_PART_TH[k] || k)
+                return (
+                  <div key={look.look_id} className="saved-look-card">
+                    <div className="analysis-card__bar analysis-card__bar--default" />
+                    <div className="saved-look-card__body">
+                      <div className="saved-look-card__header">
+                        <span className="saved-look-card__name">{look.name}</span>
+                        <button
+                          className="saved-look-card__delete"
+                          onClick={() => deleteLook(look.look_id)}
+                          title="ลบลุค"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div className="saved-look-card__meta">
+                        {look.category && (
+                          <span className="saved-look-card__category">{look.category}</span>
+                        )}
+                        <span className="saved-look-card__date">
+                          {look.created_at?.split('T')[0]}
+                        </span>
+                      </div>
+                      {activeParts.length > 0 && (
+                        <p className="saved-look-card__parts">
+                          {activeParts.join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

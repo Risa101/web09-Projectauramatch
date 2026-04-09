@@ -1,0 +1,80 @@
+@startuml ER03_Analysis_ColorScience
+!theme plain
+skinparam linetype ortho
+skinparam dpi 150
+skinparam entity {
+    BackgroundColor #F0FFF0
+    BorderColor #2C2C2C
+    FontSize 13
+    AttributeFontSize 11
+}
+
+title **ER Diagram กลุ่มที่ 3: AI Analysis & Color Science**\n//การแปลง Class → Table: การวิเคราะห์ใบหน้าและวิทยาศาสตร์สี//
+
+entity "users" as users <<อ้างอิงจากกลุ่ม 1>> #D6EEFF {
+    * **user_id** : INT <<PK>>
+    --
+    username : VARCHAR(50)
+}
+
+entity "color_palettes" as color_palettes {
+    * **palette_id** : INT <<PK, AI>>
+    --
+    * season : ENUM('spring','summer',\n  'autumn','winter') <<NN>>
+    sub_type : VARCHAR(50)
+    description : TEXT
+    best_colors : JSON {L*,a*,b*}
+    avoid_colors : JSON {L*,a*,b*}
+    makeup_tips : TEXT
+    created_at : DATETIME = NOW()
+}
+
+entity "analysis_results" as analysis_results {
+    * **analysis_id** : INT <<PK, AI>>
+    --
+    * //user_id// : INT <<FK, NN>> ON DELETE CASCADE
+    image_path : VARCHAR(255)
+    gender : ENUM('female','male','non_binary')
+    ethnicity : ENUM('asian','caucasian',\n  'african','latino',\n  'middle_eastern','south_asian',\n  'mixed','other')
+    nationality : VARCHAR(100)
+    face_shape : ENUM('oval','round','square',\n  'heart','oblong','diamond','triangle')
+    skin_tone : ENUM('fair','light','medium',\n  'tan','dark','deep')
+    skin_undertone : ENUM('warm','cool','neutral')
+    personal_color : ENUM('spring','summer',\n  'autumn','winter')
+    //palette_id// : INT <<FK>>
+    confidence_score : DECIMAL(5,2)
+    created_at : DATETIME = NOW()
+}
+
+entity "analysis_reviews" as analysis_reviews {
+    * **review_id** : INT <<PK, AI>>
+    --
+    * //analysis_id// : INT <<FK, NN>> ON DELETE CASCADE
+    * //user_id// : INT <<FK, NN>> ON DELETE CASCADE
+    is_accurate : INT
+    comment : TEXT
+    created_at : DATETIME = NOW()
+}
+
+note bottom of color_palettes
+  <b>Class → Table Mapping</b>
+  Python: <b>ColorPalette</b> (models/analysis.py)
+  Table: <b>color_palettes</b>
+  JSON columns เก็บสีในรูปแบบ CIELAB
+  4 seasons × 3 sub-types = 12 palettes
+end note
+
+note bottom of analysis_results
+  <b>Class → Table Mapping</b>
+  Python: <b>AnalysisResult</b> (models/analysis.py)
+  Table: <b>analysis_results</b>
+  ใช้ ENUM หลายตัวสำหรับ face_shape,
+  skin_tone, skin_undertone, personal_color
+end note
+
+users ||--o{ analysis_results : "1:N\nuploads"
+users ||--o{ analysis_reviews : "1:N\nreviews"
+color_palettes ||--o{ analysis_results : "1:N\nassigned palette"
+analysis_results ||--o{ analysis_reviews : "1:N\nreviewed"
+
+@enduml

@@ -1,0 +1,104 @@
+@startuml ER02_Product_Catalog
+!theme plain
+skinparam linetype ortho
+skinparam dpi 150
+skinparam entity {
+    BackgroundColor #FFFFF0
+    BorderColor #2C2C2C
+    FontSize 13
+    AttributeFontSize 11
+}
+
+title **ER Diagram กลุ่มที่ 2: Product Catalog**\n//การแปลง Class → Table: แคตาล็อกสินค้า//
+
+entity "brands" as brands {
+    * **brand_id** : INT <<PK, AI>>
+    --
+    * name : VARCHAR(100) <<NN>>
+    logo_url : VARCHAR(255)
+    website_url : VARCHAR(255)
+    description : TEXT
+    is_active : INT = 1
+    created_at : DATETIME = NOW()
+}
+
+entity "product_categories" as product_categories {
+    * **category_id** : INT <<PK, AI>>
+    --
+    * name : VARCHAR(100) <<NN>>
+    description : TEXT
+    icon_url : VARCHAR(255)
+}
+
+entity "products" as products {
+    * **product_id** : INT <<PK, AI>>
+    --
+    //brand_id// : INT <<FK>> ON DELETE SET NULL
+    //category_id// : INT <<FK>> ON DELETE SET NULL
+    * name : VARCHAR(200) <<NN>>
+    description : TEXT
+    price : DECIMAL(10,2)
+    image_url : VARCHAR(255)
+    personal_color : VARCHAR(50)
+    commission_rate : DECIMAL(5,2) = 0
+    is_active : INT = 1
+    created_at : DATETIME = NOW()
+}
+
+entity "product_links" as product_links {
+    * **link_id** : INT <<PK, AI>>
+    --
+    * //product_id// : INT <<FK, NN>> ON DELETE CASCADE
+    * platform : ENUM('shopee','tiktok',\n  'lazada','sephora',\n  'watsons','ulta') <<NN>>
+    * url : VARCHAR(500) <<NN>>
+    is_active : INT = 1
+    created_at : DATETIME = NOW()
+}
+
+entity "product_color_shades" as product_color_shades {
+    * **shade_id** : INT <<PK, AI>>
+    --
+    * //product_id// : INT <<FK, NN>> ON DELETE CASCADE
+    shade_name : VARCHAR(100)
+    shade_code : VARCHAR(20)
+    hex_color : VARCHAR(7)
+    image_url : VARCHAR(255)
+    is_active : INT = 1
+}
+
+entity "product_tags" as product_tags {
+    * **tag_id** : INT <<PK, AI>>
+    --
+    * name : VARCHAR(100) <<UK, NN>>
+}
+
+entity "product_tag_map" as product_tag_map {
+    * **id** : INT <<PK, AI>>
+    --
+    * //product_id// : INT <<FK, NN>> ON DELETE CASCADE
+    * //tag_id// : INT <<FK, NN>> ON DELETE CASCADE
+}
+
+note right of product_tag_map
+  <b>Junction Table</b>
+  ตารางเชื่อม M:N
+  ระหว่าง products กับ product_tags
+  Class: <b>ProductTagMap</b>
+end note
+
+note bottom of products
+  <b>Class → Table Mapping</b>
+  Python: <b>Product</b> (models/product.py)
+  Table: <b>products</b>
+  FK ไป brands, product_categories
+  ใช้ ON DELETE SET NULL
+end note
+
+brands ||--o{ products : "1:N\nowns"
+product_categories ||--o{ products : "1:N\ncategorizes"
+products ||--o{ product_links : "1:N\nsold on"
+products ||--o{ product_color_shades : "1:N\nhas shades"
+products ||--o{ product_tag_map : "1:N"
+product_tags ||--o{ product_tag_map : "1:N"
+
+@enduml

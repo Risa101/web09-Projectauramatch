@@ -1,0 +1,26 @@
+@startuml SD06_ViewProductDetail
+title SD-06 View Product Detail
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":ProductsPage" as PP
+entity ":BehaviorDB" as BDB
+
+User -> PP : selectProduct(product_id)
+activate PP
+
+PP -> PP : displayProductCard(\nname, brand, price,\ndescription, category,\nimage, personal_color)
+
+PP -> PP : displayPlatformLinks(\nShopee, TikTok, Lazada)
+
+PP -> BDB : trackEvent(product_view, product_id)
+activate BDB
+deactivate BDB
+
+PP --> User : displayProductDetail()
+deactivate PP
+
+@enduml

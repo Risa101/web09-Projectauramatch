@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, text
 from config.database import get_db
 from models.behavior import UserBehavior
-from routes.auth import get_current_user, security
+from routes.auth import get_current_user, require_admin, security
+from models.user import User
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
@@ -93,6 +94,7 @@ def track_batch(
 @router.get("/analytics/summary")
 def get_analytics_summary(
     days: int = 30,
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """สรุปภาพรวม analytics"""
@@ -124,6 +126,7 @@ def get_analytics_summary(
 def get_top_products(
     days: int = 30,
     limit: int = 10,
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """สินค้าที่ถูกดูมากที่สุด"""
@@ -153,6 +156,7 @@ def get_top_products(
 def get_top_searches(
     days: int = 30,
     limit: int = 20,
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """คำค้นหายอดนิยม"""
@@ -180,6 +184,7 @@ def get_top_searches(
 @router.get("/analytics/filter-usage")
 def get_filter_usage(
     days: int = 30,
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """สถิติการใช้ตัวกรอง"""
@@ -207,6 +212,7 @@ def get_filter_usage(
 @router.get("/analytics/makeup-behavior")
 def get_makeup_behavior(
     days: int = 30,
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """พฤติกรรมการแต่งหน้า"""
@@ -255,6 +261,7 @@ def get_makeup_behavior(
 @router.get("/analytics/personal-color-demand")
 def get_personal_color_demand(
     days: int = 30,
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """ความต้องการตาม personal color"""
@@ -282,6 +289,7 @@ def get_personal_color_demand(
 @router.get("/analytics/click-funnel")
 def get_click_funnel(
     days: int = 30,
+    admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Conversion funnel: ดูสินค้า → กดลิงก์ซื้อ"""

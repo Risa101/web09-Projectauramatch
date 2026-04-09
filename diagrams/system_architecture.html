@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AuraMatch - System Architecture Diagram</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    background: #f8f9fb;
+    color: #1a1a2e;
+    padding: 40px;
+  }
+
+  .page {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 16px;
+    padding: 48px;
+    box-shadow: 0 2px 24px rgba(0,0,0,0.06);
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #1a1a2e;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 40px;
+  }
+
+  /* ===== DIAGRAM CONTAINER ===== */
+  .diagram {
+    position: relative;
+    width: 100%;
+    min-height: 900px;
+  }
+
+  /* ===== TIER LABELS ===== */
+  .tier-label {
+    position: absolute;
+    left: -8px;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #9ca3af;
+    padding: 12px 0;
+  }
+
+  /* ===== LAYER BOXES ===== */
+  .layer {
+    position: relative;
+    margin-left: 32px;
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .layer-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .layer-title .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  /* ===== CLIENT LAYER ===== */
+  .layer-client {
+    background: linear-gradient(135deg, #eff6ff 0%, #f0f4ff 100%);
+    border: 1.5px solid #bfdbfe;
+  }
+  .layer-client .layer-title { color: #1e40af; }
+  .layer-client .icon { background: #3b82f6; color: #fff; }
+
+  /* ===== SERVER LAYER ===== */
+  .layer-server {
+    background: linear-gradient(135deg, #f0fdf4 0%, #f0fdf9 100%);
+    border: 1.5px solid #bbf7d0;
+  }
+  .layer-server .layer-title { color: #166534; }
+  .layer-server .icon { background: #22c55e; color: #fff; }
+
+  /* ===== DATA LAYER ===== */
+  .layer-data {
+    background: linear-gradient(135deg, #fefce8 0%, #fff7ed 100%);
+    border: 1.5px solid #fde68a;
+  }
+  .layer-data .layer-title { color: #92400e; }
+  .layer-data .icon { background: #f59e0b; color: #fff; }
+
+  /* ===== EXTERNAL LAYER ===== */
+  .layer-external {
+    background: linear-gradient(135deg, #fdf2f8 0%, #faf5ff 100%);
+    border: 1.5px solid #f0abfc;
+  }
+  .layer-external .layer-title { color: #86198f; }
+  .layer-external .icon { background: #a855f7; color: #fff; }
+
+  /* ===== NODE GRID ===== */
+  .node-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .node {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    min-width: 130px;
+    flex: 1;
+    transition: transform 0.15s;
+  }
+
+  .node:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+  .node-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+  }
+
+  .node-desc {
+    font-size: 11px;
+    color: #6b7280;
+    line-height: 1.4;
+  }
+
+  .node-tech {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: #f3f4f6;
+    color: #4b5563;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 6px;
+  }
+
+  /* ===== SECTION WITHIN LAYER ===== */
+  .section {
+    margin-bottom: 14px;
+  }
+  .section:last-child { margin-bottom: 0; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    padding-left: 4px;
+    border-left: 3px solid;
+  }
+
+  .section-title.blue { border-color: #3b82f6; }
+  .section-title.green { border-color: #22c55e; }
+  .section-title.amber { border-color: #f59e0b; }
+  .section-title.purple { border-color: #a855f7; }
+
+  /* ===== CONNECTION ARROWS ===== */
+  .arrow-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 0;
+    margin-left: 32px;
+  }
+
+  .arrow-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 20px;
+    background: #fff;
+    border-radius: 20px;
+    border: 1px dashed #d1d5db;
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .arrow-icon {
+    font-size: 16px;
+    color: #9ca3af;
+  }
+
+  /* ===== SPECIAL NODES ===== */
+  .node-highlight {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #fff 0%, #eff6ff 100%);
+  }
+
+  .node-highlight-green {
+    border-color: #22c55e;
+    background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%);
+  }
+
+  /* ===== PORT BADGE ===== */
+  .port-badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    background: #1e40af;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+  }
+
+  .port-badge.green { background: #166534; }
+  .port-badge.amber { background: #92400e; }
+
+  /* ===== MIDDLEWARE BAR ===== */
+  .middleware-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .middleware-tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: rgba(34, 197, 94, 0.1);
+    color: #166534;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+  }
+
+  /* ===== TWO COLUMN LAYOUT ===== */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* ===== FLOW DIAGRAM ===== */
+  .flow-section {
+    margin-top: 40px;
+    padding-top: 32px;
+    border-top: 2px solid #f3f4f6;
+  }
+
+  .flow-title {
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 24px;
+    color: #1a1a2e;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-bottom: 0;
+  }
+
+  .flow-step {
+    flex: 1;
+    padding: 16px;
+    text-align: center;
+    position: relative;
+    background: #fff;
+    border: 1.5px solid #e5e7eb;
+  }
+
+  .flow-step:first-child { border-radius: 12px 0 0 12px; }
+  .flow-step:last-child { border-radius: 0 12px 12px 0; }
+
+  .flow-step .step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .flow-step .step-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 4px;
+  }
+
+  .flow-step .step-desc {
+    font-size: 10px;
+    color: #6b7280;
+    line-height: 1.3;
+  }
+
+  .flow-step .step-tech {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #9ca3af;
+    margin-top: 4px;
+  }
+
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    font-size: 20px;
+    color: #d1d5db;
+    padding: 0 2px;
+  }
+
+  /* Colors for flow steps */
+  .step-blue { border-color: #93c5fd; background: #eff6ff; }
+  .step-blue .step-num { background: #3b82f6; }
+
+  .step-green { border-color: #86efac; background: #f0fdf4; }
+  .step-green .step-num { background: #22c55e; }
+
+  .step-amber { border-color: #fcd34d; background: #fefce8; }
+  .step-amber .step-num { background: #f59e0b; }
+
+  .step-purple { border-color: #d8b4fe; background: #faf5ff; }
+  .step-purple .step-num { background: #a855f7; }
+
+  .step-rose { border-color: #fda4af; background: #fff1f2; }
+  .step-rose .step-num { background: #f43f5e; }
+
+  /* ===== FOOTER ===== */
+  .diagram-footer {
+    text-align: center;
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  /* ===== PRINT STYLES ===== */
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; padding: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <h1>System Architecture Diagram</h1>
+  <p class="subtitle">AuraMatch &mdash; AI-Powered Beauty Recommendation Platform</p>
+
+  <div class="diagram">
+
+    <!-- ========== PRESENTATION TIER (CLIENT) ========== -->
+    <div class="layer layer-client">
+      <div class="layer-title">
+        <span class="icon">&#x1F310;</span>
+        Presentation Tier &mdash; Frontend
+        <span class="port-badge">Port 5175</span>
+      </div>
+
+      <div class="section">
+        <div class="section-title blue">Tech Stack</div>
+        <div class="middleware-bar">
+          <span class="middleware-tag" style="background:rgba(59,130,246,0.1);color:#1e40af;border-color:rgba(59,130,246,0.2);">React 19</span>
+          <span class="middleware-tag" style="background:rgba(59,130,246,0.1);color:#1e40af;border-color:rgba(59,130,246,0.2);">Vite 8</span>
+          <span class="middleware-tag" style="background:rgba(59,130,246,0.1);color:#1e40af;border-color:rgba(59,130,246,0.2);">Tailwind CSS 4</span>
+          <span class="middleware-tag" style="background:rgba(59,130,246,0.1);color:#1e40af;border-color:rgba(59,130,246,0.2);">React Router 7</span>
+          <span class="middleware-tag" style="background:rgba(59,130,246,0.1);color:#1e40af;border-color:rgba(59,130,246,0.2);">Axios</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title blue">Pages (Routes)</div>
+        <div class="node-grid">
+          <div class="node">
+            <div class="node-label">Home</div>
+            <div class="node-desc">Landing Page</div>
+            <span class="node-tech">/</span>
+          </div>
+          <div class="node node-highlight">
+            <div class="node-label">Analyze</div>
+            <div class="node-desc">วิเคราะห์ใบหน้า</div>
+            <span class="node-tech">/analyze</span>
+          </div>
+          <div class="node node-highlight">
+            <div class="node-label">Products</div>
+            <div class="node-desc">สินค้า + เปรียบเทียบ</div>
+            <span class="node-tech">/products</span>
+          </div>
+          <div class="node">
+            <div class="node-label">Gemini Chat</div>
+            <div class="node-desc">AI ที่ปรึกษาความงาม</div>
+            <span class="node-tech">/gemini</span>
+          </div>
+          <div class="node">
+            <div class="node-label">Photo Editor</div>
+            <div class="node-desc">แต่งรูป + Makeup</div>
+            <span class="node-tech">/editor</span>
+          </div>
+          <div class="node">
+            <div class="node-label">Profile</div>
+            <div class="node-desc">โปรไฟล์ + ประวัติ</div>
+            <span class="node-tech">/profile</span>
+          </div>
+          <div class="node">
+            <div class="node-label">Login / Register</div>
+            <div class="node-desc">ยืนยันตัวตน</div>
+            <span class="node-tech">/login</span>
+          </div>
+          <div class="node">
+            <div class="node-label">Admin</div>
+            <div class="node-desc">แดชบอร์ดผู้ดูแล</div>
+            <span class="node-tech">/admin</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title blue">Core Modules</div>
+        <div class="node-grid">
+          <div class="node">
+            <div class="node-label">AuthContext</div>
+            <div class="node-desc">JWT state + localStorage</div>
+          </div>
+          <div class="node">
+            <div class="node-label">Axios Instance</div>
+            <div class="node-desc">API client + JWT interceptor</div>
+          </div>
+          <div class="node">
+            <div class="node-label">Behavior Tracker</div>
+            <div class="node-desc">Event batching (10 items / 3s)</div>
+          </div>
+          <div class="node">
+            <div class="node-label">React Webcam</div>
+            <div class="node-desc">Camera capture</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ARROW: Client → Server -->
+    <div class="arrow-container">
+      <div class="arrow-line">
+        <span class="arrow-icon">&#x2B07;</span>
+        HTTP REST API &mdash; Vite Proxy <code style="font-family:'JetBrains Mono';font-size:11px;background:#e5e7eb;padding:2px 6px;border-radius:3px;">/api/*</code> &rarr; <code style="font-family:'JetBrains Mono';font-size:11px;background:#e5e7eb;padding:2px 6px;border-radius:3px;">localhost:8001</code>
+        <span class="arrow-icon">&#x2B07;</span>
+      </div>
+    </div>
+
+    <!-- ========== APPLICATION TIER (SERVER) ========== -->
+    <div class="layer layer-server">
+      <div class="layer-title">
+        <span class="icon">&#x2699;</span>
+        Application Tier &mdash; Backend
+        <span class="port-badge green">Port 8001</span>
+      </div>
+
+      <div class="section">
+        <div class="section-title green">Middleware</div>
+        <div class="middleware-bar">
+          <span class="middleware-tag">FastAPI 0.111</span>
+          <span class="middleware-tag">Uvicorn (ASGI)</span>
+          <span class="middleware-tag">CORS</span>
+          <span class="middleware-tag">JWT Auth (HS256)</span>
+          <span class="middleware-tag">Static Files (/uploads)</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title green">API Routers (10 groups)</div>
+        <div class="node-grid">
+          <div class="node node-highlight-green">
+            <div class="node-label">/analysis</div>
+            <div class="node-desc">วิเคราะห์ใบหน้า + สี</div>
+          </div>
+          <div class="node node-highlight-green">
+            <div class="node-label">/recommendations</div>
+            <div class="node-desc">แนะนำ + เปรียบเทียบ</div>
+          </div>
+          <div class="node">
+            <div class="node-label">/products</div>
+            <div class="node-desc">CRUD + Similar + Filter</div>
+          </div>
+          <div class="node">
+            <div class="node-label">/auth</div>
+            <div class="node-desc">Register / Login / JWT</div>
+          </div>
+          <div class="node">
+            <div class="node-label">/gemini</div>
+            <div class="node-desc">AI Chat sessions</div>
+          </div>
+          <div class="node">
+            <div class="node-label">/profile</div>
+            <div class="node-desc">ข้อมูลผู้ใช้</div>
+          </div>
+          <div class="node">
+            <div class="node-label">/landmarks</div>
+            <div class="node-desc">68-point detection</div>
+          </div>
+          <div class="node">
+            <div class="node-label">/behavior</div>
+            <div class="node-desc">Analytics + Funnel</div>
+          </div>
+          <div class="node">
+            <div class="node-label">/looks</div>
+            <div class="node-desc">Saved makeup looks</div>
+          </div>
+          <div class="node">
+            <div class="node-label">/commission</div>
+            <div class="node-desc">Click tracking</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title green">Services Layer (Business Logic)</div>
+        <div class="node-grid">
+          <div class="node node-highlight-green">
+            <div class="node-label">AI Service</div>
+            <div class="node-desc">Orchestrator: Face analysis pipeline (Single-Pass)</div>
+            <span class="node-tech">MediaPipe + CNN + OpenCV</span>
+          </div>
+          <div class="node node-highlight-green">
+            <div class="node-label">Color Analysis</div>
+            <div class="node-desc">CIELAB color space, skin extraction, CIEDE2000</div>
+            <span class="node-tech">colour-science + sklearn</span>
+          </div>
+          <div class="node node-highlight-green">
+            <div class="node-label">Scoring Service</div>
+            <div class="node-desc">Multi-signal scoring S1&ndash;S6</div>
+            <span class="node-tech">CIEDE2000 + weighted sum</span>
+          </div>
+          <div class="node">
+            <div class="node-label">Recommendation</div>
+            <div class="node-desc">Similar products search</div>
+            <span class="node-tech">TF-IDF + Cosine Similarity</span>
+          </div>
+          <div class="node">
+            <div class="node-label">Gemini Service</div>
+            <div class="node-desc">AI chat wrapper</div>
+            <span class="node-tech">Google GenAI SDK</span>
+          </div>
+          <div class="node">
+            <div class="node-label">Landmark Service</div>
+            <div class="node-desc">68-point facial landmarks</div>
+            <span class="node-tech">dlib + MediaPipe</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ARROW: Server → Data -->
+    <div class="arrow-container">
+      <div class="arrow-line">
+        <span class="arrow-icon">&#x2B07;</span>
+        SQLAlchemy ORM &mdash; PyMySQL Driver
+        <span class="arrow-icon">&#x2B07;</span>
+      </div>
+    </div>
+
+    <!-- ========== DATA TIER + EXTERNAL ========== -->
+    <div class="two-col">
+
+      <!-- DATA TIER -->
+      <div class="layer layer-data">
+        <div class="layer-title">
+          <span class="icon">&#x1F4BE;</span>
+          Data Tier &mdash; Database
+          <span class="port-badge amber">Port 3306</span>
+        </div>
+
+        <div class="section">
+          <div class="section-title amber">MySQL &mdash; auramatchnewversion</div>
+          <div class="node-grid" style="flex-direction:column;">
+            <div class="node">
+              <div class="node-label">User Management</div>
+              <div class="node-desc">users, user_profiles, password_resets</div>
+            </div>
+            <div class="node">
+              <div class="node-label">Analysis & Color</div>
+              <div class="node-desc">analysis_results, color_palettes (12 sub-season, JSON CIELAB)</div>
+            </div>
+            <div class="node">
+              <div class="node-label">Products</div>
+              <div class="node-desc">products, brands, categories, color_shades, product_links</div>
+            </div>
+            <div class="node">
+              <div class="node-label">Recommendations</div>
+              <div class="node-desc">recommendation_rules, recommendations, feedback, favorites</div>
+            </div>
+            <div class="node">
+              <div class="node-label">AI Chat & Editor</div>
+              <div class="node-desc">gemini_sessions, messages, photo_edits, saved_looks</div>
+            </div>
+            <div class="node">
+              <div class="node-label">Analytics & Commerce</div>
+              <div class="node-desc">user_behaviors, click_logs, commissions, search_history</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXTERNAL SERVICES -->
+      <div class="layer layer-external">
+        <div class="layer-title">
+          <span class="icon">&#x2601;</span>
+          External Services
+        </div>
+
+        <div class="section">
+          <div class="section-title purple">AI / ML Models & APIs</div>
+          <div class="node-grid" style="flex-direction:column;">
+            <div class="node">
+              <div class="node-label">Google Gemini 2.0 Flash</div>
+              <div class="node-desc">AI Chat: text + image prompts</div>
+              <span class="node-tech">google.generativeai SDK</span>
+            </div>
+            <div class="node">
+              <div class="node-label">MediaPipe FaceMesh</div>
+              <div class="node-desc">468-point facial landmark detection</div>
+              <span class="node-tech">mediapipe 0.10.14</span>
+            </div>
+            <div class="node">
+              <div class="node-label">CNN Face Shape Model</div>
+              <div class="node-desc">7-class face shape classification</div>
+              <span class="node-tech">TensorFlow/Keras (.h5)</span>
+            </div>
+            <div class="node">
+              <div class="node-label">dlib</div>
+              <div class="node-desc">68-point landmark detection</div>
+              <span class="node-tech">dlib 19.24.4</span>
+            </div>
+            <div class="node">
+              <div class="node-label">colour-science</div>
+              <div class="node-desc">sRGB &rarr; XYZ &rarr; CIELAB, CIEDE2000 (&Delta;E00)</div>
+              <span class="node-tech">colour 0.4.4</span>
+            </div>
+            <div class="node">
+              <div class="node-label">scikit-learn</div>
+              <div class="node-desc">K-Means Clustering, TF-IDF, Cosine Similarity</div>
+              <span class="node-tech">sklearn 1.4.2</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ========== FACE ANALYSIS PIPELINE FLOW ========== -->
+  <div class="flow-section">
+    <div class="flow-title">Face Analysis Pipeline (Single-Pass Architecture)</div>
+
+    <div class="flow-row">
+      <div class="flow-step step-blue">
+        <div class="step-num">1</div>
+        <div class="step-label">Upload Image</div>
+        <div class="step-desc">อัปโหลดรูปหรือ<br>ถ่ายจาก Webcam</div>
+        <div class="step-tech">React Webcam / FormData</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step step-green">
+        <div class="step-num">2</div>
+        <div class="step-label">FaceMesh</div>
+        <div class="step-desc">ตรวจจับ 468 จุด<br>Landmark + BBox + Crop</div>
+        <div class="step-tech">MediaPipe (single-pass)</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step step-green">
+        <div class="step-num">3</div>
+        <div class="step-label">Face Shape</div>
+        <div class="step-desc">CNN 7 รูปแบบ<br>หรือ Geometry Fallback</div>
+        <div class="step-tech">TensorFlow / Landmark ratios</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step step-amber">
+        <div class="step-num">4</div>
+        <div class="step-label">Skin Extraction</div>
+        <div class="step-desc">สกัดสีผิวจากแก้ม<br>K-Means 6 clusters</div>
+        <div class="step-tech">OpenCV + sklearn</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step step-amber">
+        <div class="step-num">5</div>
+        <div class="step-label">Color Science</div>
+        <div class="step-desc">CIELAB &rarr; Tone<br>Undertone &rarr; Season</div>
+        <div class="step-tech">colour-science / CIEDE2000</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step step-purple">
+        <div class="step-num">6</div>
+        <div class="step-label">Scoring S1&ndash;S6</div>
+        <div class="step-desc">คะแนน 6 สัญญาณ<br>จัดอันดับสินค้า</div>
+        <div class="step-tech">Multi-Signal Scoring</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step step-rose">
+        <div class="step-num">7</div>
+        <div class="step-label">Enriched Response</div>
+        <div class="step-desc">ผลวิเคราะห์ + Palette<br>+ Tips + สินค้าแนะนำ</div>
+        <div class="step-tech">Single JSON response</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== RECOMMENDATION SCORING FLOW ========== -->
+  <div class="flow-section">
+    <div class="flow-title">Multi-Signal Scoring Engine (S1&ndash;S6)</div>
+
+    <div class="flow-row">
+      <div class="flow-step step-blue" style="flex:1.2;">
+        <div class="step-num">S1</div>
+        <div class="step-label">Rule Match</div>
+        <div class="step-desc">กฎจับคู่<br>face_shape, skin_tone,<br>undertone, personal_color</div>
+        <div class="step-tech" style="background:#dbeafe;">0 &ndash; 300</div>
+      </div>
+      <div class="flow-step step-green" style="flex:1.2;">
+        <div class="step-num">S2</div>
+        <div class="step-label">Color Proximity</div>
+        <div class="step-desc">ระยะห่างสี<br>CIEDE2000 กับ<br>best_colors palette</div>
+        <div class="step-tech" style="background:#dcfce7;">0 &ndash; 300</div>
+      </div>
+      <div class="flow-step step-amber" style="flex:1;">
+        <div class="step-num">S3</div>
+        <div class="step-label">Seasonal Match</div>
+        <div class="step-desc">ตรง season<br>ของผู้ใช้</div>
+        <div class="step-tech" style="background:#fef9c3;">0 &ndash; 150</div>
+      </div>
+      <div class="flow-step step-rose" style="flex:1;">
+        <div class="step-num">S4</div>
+        <div class="step-label">Avoid Penalty</div>
+        <div class="step-desc">ใกล้ avoid_colors<br>= หักคะแนน</div>
+        <div class="step-tech" style="background:#ffe4e6;">-100 &ndash; 0</div>
+      </div>
+      <div class="flow-step step-purple" style="flex:1;">
+        <div class="step-num">S5</div>
+        <div class="step-label">Feedback</div>
+        <div class="step-desc">Like / Dislike<br>ratio</div>
+        <div class="step-tech" style="background:#f3e8ff;">0 &ndash; 100</div>
+      </div>
+      <div class="flow-step" style="flex:0.8;border-color:#a3a3a3;background:#fafafa;">
+        <div class="step-num" style="background:#737373;">S6</div>
+        <div class="step-label">Popularity</div>
+        <div class="step-desc">จำนวน<br>Favorites</div>
+        <div class="step-tech" style="background:#f5f5f5;">0 &ndash; 50</div>
+      </div>
+    </div>
+
+    <div class="arrow-container" style="margin-left:0;">
+      <div class="arrow-line">
+        <span class="arrow-icon">&#x2B07;</span>
+        Final Score = S1 + S2 + S3 + S4 + S5 + S6 &rarr; เรียงจากมากไปน้อย &rarr; Top 20 สินค้าแนะนำ
+        <span class="arrow-icon">&#x2B07;</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="diagram-footer">
+    AuraMatch System Architecture &mdash; AI-Powered Beauty Recommendation Platform<br>
+    Web Application Development Project 2026
+  </div>
+
+</div>
+
+</body>
+</html>

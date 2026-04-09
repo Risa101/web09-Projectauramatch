@@ -1,0 +1,1190 @@
+================================================================================
+                        AuraMatch - ข้อมูลโปรเจกต์ทั้งหมด
+================================================================================
+
+1. ภาพรวมโปรเจกต์
+--------------------------------------------------------------------------------
+AuraMatch คือแพลตฟอร์ม AI แนะนำเครื่องสำอาง โดยวิเคราะห์รูปหน้า สีผิว อันเดอร์โทน
+และ Personal Color เพื่อแนะนำผลิตภัณฑ์ที่เหมาะสม
+
+ฟีเจอร์หลัก:
+- วิเคราะห์รูปทรงใบหน้า (Face Shape Detection)
+- วิเคราะห์สีผิวและอันเดอร์โทน (Skin Tone / Undertone Analysis)
+- จำแนก Personal Color Season (Spring/Summer/Autumn/Winter × 3 sub-types = 12 seasons)
+- แนะนำเครื่องสำอางด้วยระบบ Multi-Signal Scoring (6 สัญญาณ)
+- เปรียบเทียบสินค้า (สูงสุด 3 ชิ้น)
+- สินค้าคล้ายกัน (TF-IDF + Cosine Similarity)
+- แต่งหน้าบนรูป (Photo Editor) + ฟิลเตอร์ + Preset Looks
+- แชท AI ด้วย Gemini
+- ระบบ Affiliate tracking (Shopee, TikTok Shop, Lazada)
+- User Behavior Analytics
+
+
+================================================================================
+2. Tech Stack
+================================================================================
+
+Frontend:
+  - React 19.2.4 + Vite 8.0.1
+  - Tailwind CSS 4.2.2
+  - React Router DOM 7.13.2
+  - Axios 1.14.0
+  - Lucide React 1.7.0 (icons)
+  - react-webcam 7.2.0
+
+Backend:
+  - Python FastAPI 0.111.0
+  - SQLAlchemy 2.0.30 ORM
+  - MySQL (PyMySQL 1.1.1)
+  - Uvicorn 0.29.0 (ASGI server)
+
+AI/ML:
+  - MediaPipe 0.10.14 (FaceMesh 468 จุด)
+  - dlib 19.24.4 (68-point face landmarks)
+  - TensorFlow/Keras (Face Shape CNN model)
+  - Google Generative AI 0.5.4 (Gemini 2.0 Flash)
+  - scikit-learn 1.4.2 (TF-IDF, KMeans)
+  - OpenCV 4.9.0.80
+
+Color Science:
+  - colour-science 0.4.4 (CIELAB / CIEDE2000)
+
+Auth:
+  - JWT (python-jose 3.3.0)
+  - bcrypt (passlib 1.7.4)
+
+
+================================================================================
+3. โครงสร้างโปรเจกต์ (Monorepo)
+================================================================================
+
+web09_Projectauramatch/
+├── frontendauramatchnewversion/       # React SPA
+│   ├── src/
+│   │   ├── api/
+│   │   │   └── axios.js              # Axios instance + JWT interceptor
+│   │   ├── components/
+│   │   │   ├── Navbar.jsx             # Navigation bar
+│   │   │   └── Navbar.css
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx        # Auth state (React Context API)
+│   │   ├── pages/
+│   │   │   ├── Home.jsx              # Landing page
+│   │   │   ├── Login.jsx             # เข้าสู่ระบบ
+│   │   │   ├── Register.jsx          # สมัครสมาชิก
+│   │   │   ├── Analyze.jsx           # วิเคราะห์ใบหน้า
+│   │   │   ├── Products.jsx          # แคตาล็อกสินค้า
+│   │   │   ├── GeminiChat.jsx        # แชท AI
+│   │   │   ├── PhotoEditor.jsx       # แต่งรูป
+│   │   │   ├── Profile.jsx           # โปรไฟล์ผู้ใช้
+│   │   │   └── admin/
+│   │   │       └── Dashboard.jsx     # Admin dashboard
+│   │   ├── services/
+│   │   │   └── tracker.js            # User behavior tracking
+│   │   ├── App.jsx                   # Router setup
+│   │   ├── main.jsx                  # Entry point
+│   │   └── index.css                 # Tailwind import
+│   ├── package.json
+│   └── vite.config.js
+│
+├── backendauramatchnewversion/        # FastAPI REST API
+│   ├── main.py                        # App setup + route registration
+│   ├── config/
+│   │   └── database.py               # MySQL connection + SQLAlchemy
+│   ├── models/
+│   │   ├── user.py                   # User, roles
+│   │   ├── analysis.py              # AnalysisResult, ColorPalette
+│   │   ├── product.py               # Product, Brand, Category, Links, Shades, Tags
+│   │   ├── recommendation.py        # Recommendation, Rules, Feedback, Favorite
+│   │   ├── commission.py            # ClickLog, Commission
+│   │   ├── behavior.py             # UserBehavior
+│   │   ├── saved_look.py           # SavedLook
+│   │   ├── gemini.py               # GeminiSession, GeminiMessage
+│   │   ├── misc.py                 # Profile, Notification, Banner, Reviews, etc.
+│   │   ├── blog.py                 # BlogPost, BlogCategory
+│   │   └── photo_editor.py         # EditFilter, EditSticker, PhotoEdit
+│   ├── routes/
+│   │   ├── auth.py                  # /auth/*
+│   │   ├── analysis.py             # /analysis/*
+│   │   ├── products.py             # /products/*
+│   │   ├── recommendations.py      # /recommendations/*
+│   │   ├── profile.py              # /profile/*
+│   │   ├── commission.py           # /commission/*
+│   │   ├── gemini.py               # /gemini/*
+│   │   ├── behavior.py             # /behavior/*
+│   │   ├── landmarks.py            # /landmarks/*
+│   │   └── saved_looks.py          # /looks/*
+│   ├── services/
+│   │   ├── ai_service.py           # Face shape + skin analysis pipeline
+│   │   ├── color_analysis_service.py # CIELAB color science
+│   │   ├── scoring_service.py      # Multi-signal recommendation scoring
+│   │   ├── recommendation_service.py # TF-IDF product similarity
+│   │   ├── landmark_service.py     # dlib 68-point detection
+│   │   └── gemini_service.py       # Gemini AI integration
+│   ├── scripts/
+│   │   ├── seed_data.py            # Create demo users + rules
+│   │   ├── seed_color_palettes.py  # 12-season palette data
+│   │   ├── train_face_shape.py
+│   │   ├── import_makeup_data.py
+│   │   └── import_all_makeup.py
+│   ├── tests/
+│   │   ├── test_color_analysis_service.py    # 67 tests
+│   │   ├── test_face_shape_decision_tree.py  # 39 tests
+│   │   └── test_scoring_service.py
+│   ├── models_ai/                   # Pre-trained models (.h5, .dat)
+│   ├── uploads/                     # User-uploaded images
+│   └── requirements.txt
+│
+├── auramatch.sql                     # Database schema
+├── seed_makeup_products.sql          # Product seed data
+├── seed_personal_color.sql           # Personal color seed data
+└── CLAUDE.md                         # Project instructions
+
+
+================================================================================
+4. หน้าเว็บทั้งหมด (9 หน้า)
+================================================================================
+
+4.1 Home (/)
+--------------------------------------------------------------------------------
+- Landing page พร้อม parallax mouse tracking
+- 3D tilt cards แนะนำฟีเจอร์
+- แสดง 4 Personal Color Seasons พร้อม color palettes
+- สินค้าแนะนำ 4 ชิ้นพร้อมราคา + platform badges
+- รีวิวจากผู้ใช้ 3 คน
+- Trust badge (10,000+ users)
+- CTA buttons ไปหน้า /analyze และ /products
+- API calls: ไม่มี (static content)
+
+4.2 Login (/login)
+--------------------------------------------------------------------------------
+- ฟอร์มเข้าสู่ระบบ (email + password)
+- Split panel layout (ซ้าย: branding, ขวา: form)
+- แสดง error message
+- Loading state
+- หลัง login สำเร็จ: admin → /admin, user → /
+- API calls:
+  POST /auth/login?email={email}&password={password}
+  Response: { access_token, role }
+
+4.3 Register (/register)
+--------------------------------------------------------------------------------
+- ฟอร์มสมัครสมาชิก (username, email, password)
+- Loading spinner animation
+- Error display
+- สมัครสำเร็จ → redirect ไป /login
+- API calls:
+  POST /auth/register?username={username}&email={email}&password={password}
+
+4.4 Analyze (/analyze) — ฟีเจอร์หลัก
+--------------------------------------------------------------------------------
+- อัปโหลดรูปภาพ + เลือกเพศ (Female/Male)
+- ปุ่มวิเคราะห์พร้อม loading spinner
+- แสดงผลลัพธ์:
+  * Personal Color badge (สีตาม season)
+  * Face Shape, Skin Tone, Undertone
+  * Confidence score + progress bar
+  * Face shape tips (description, contouring, styles)
+  * Color palette swatches + makeup tips
+- Product recommendations grid
+- Platform links (Shopee/TikTok/Lazada) พร้อม click tracking
+- API calls:
+  POST /analysis/?gender={female|male}  (FormData: file)
+  POST /recommendations/generate/{analysis_id}  (fallback)
+  GET /recommendations/{analysis_id}             (fallback)
+
+4.5 Products (/products)
+--------------------------------------------------------------------------------
+- Search bar (real-time)
+- Multi-filter panel:
+  * Categories (หมวดหมู่เครื่องสำอาง)
+  * Brands (เรียงตาม alphabet)
+  * Personal Colors (Spring/Summer/Autumn/Winter)
+  * Sort (newest, price asc/desc)
+- Product grid (8 ต่อหน้า, skeleton loaders)
+- Product cards:
+  * รูป + ราคา + หมวดหมู่ badge
+  * แบรนด์, ชื่อ, คำอธิบาย
+  * Personal color dots
+  * ปุ่ม platform links
+  * ปุ่ม "สินค้าคล้ายกัน" → modal
+  * Checkbox "เปรียบเทียบ" (สูงสุด 3 ชิ้น)
+- Floating compare bar
+- Compare modal (ตาราง):
+  * ชื่อสินค้า, แบรนด์, ราคา, หมวดหมู่
+  * ความเข้ากันของสี (Color Match %)
+  * เคล็ดลับตามรูปหน้า (Face Shape Tips)
+  * ลิงก์ซื้อ
+- Similar products modal (TF-IDF)
+- API calls:
+  GET /products/categories
+  GET /products/brands
+  GET /products/?category_id=&brand_id=&personal_color=&search=&sort=&limit=50
+  GET /profile/analyses
+  POST /recommendations/compare  { analysis_id, product_ids: [] }
+  GET /products/similar/{product_id}?limit=6
+  POST /commission/click/{link_id}
+
+4.6 Gemini Chat (/gemini)
+--------------------------------------------------------------------------------
+- Chat interface พร้อม message history
+- User & AI message bubbles
+- อัปโหลดรูปได้ (optional ต่อข้อความ)
+- Text input + Enter key send
+- Auto-scroll to latest message
+- Loading spinner
+- Session สร้างอัตโนมัติตอนส่งข้อความแรก
+- API calls:
+  POST /gemini/session?title={title}
+  POST /gemini/session/{session_id}/chat?prompt={prompt}  (FormData: file)
+
+4.7 Photo Editor (/editor)
+--------------------------------------------------------------------------------
+- อัปโหลดรูป
+- 2 แท็บ: Makeup & Filters
+- Filters:
+  * 8 preset filters (Normal, Bright, Soft, Vintage, Sharp, B&W, Vivid, Rose)
+  * Manual sliders: Brightness, Contrast, Saturation
+- Makeup (9 ส่วน):
+  * ปาก (Lips), ตา (Eyes), อายไลเนอร์ (Eyeliner)
+  * คิ้ว (Eyebrows), ขนตา (Lashes), จมูก (Nose)
+  * บลัช (Blush), ไฮไลท์ (Highlight), รองพื้น (Foundation)
+  * แต่ละส่วนมี 8-12 สี + intensity slider
+  * Canvas rendering ด้วย bezier curves & radial gradients
+- 8 Preset Looks:
+  * Korean Natural, Glam Night, Soft Girl, Office Day
+  * Sunset Glow, Berry Queen, Fresh No-Makeup, Red Carpet
+- Makeup tips (4 tips ต่อหมวด)
+- บันทึก/โหลด/ลบ looks
+- ดาวน์โหลดรูป
+- ปุ่ม Reset + Before/After toggle
+- Product recommendations ตามส่วนที่แต่ง
+- API calls:
+  POST /landmarks/detect  (FormData: file)
+  GET /looks/
+  POST /looks/  { name, category, makeup_data, filter_data }
+  DELETE /looks/{look_id}
+  GET /products/makeup-recommendations?parts={lips,eyes,...}
+
+4.8 Profile (/profile)
+--------------------------------------------------------------------------------
+- Loading skeleton
+- แสดงข้อมูลผู้ใช้ (email, username, วันสมัคร)
+- แก้ไขได้:
+  * ชื่อ-นามสกุล, Display name, Bio
+  * เพศ (dropdown), สัญชาติ
+- ปุ่ม Save + loading spinner
+- ประวัติการวิเคราะห์:
+  * Analysis cards + seasonal badge (สีตาม season)
+  * Face shape, skin tone, undertone
+  * Confidence score + progress bar
+  * Timestamp
+- API calls:
+  GET /profile/
+  PUT /profile/?first_name=&last_name=&display_name=&bio=&gender=&nationality=
+  GET /profile/analyses
+
+4.9 Admin Dashboard (/admin)
+--------------------------------------------------------------------------------
+- Top stat cards:
+  * Total Clicks (purple icon)
+  * Total Commission in THB (pink icon)
+- Platform breakdown table (Shopee/TikTok/Lazada):
+  * Clicks, Commission ต่อ platform
+- API calls:
+  GET /commission/stats
+
+
+================================================================================
+5. API Endpoints ทั้งหมด (37 endpoints)
+================================================================================
+
+5.1 Authentication (/auth)
+--------------------------------------------------------------------------------
+POST /auth/register
+  - สมัครสมาชิก
+  - Params: username, email, password
+  - Response: { message: "User registered successfully" }
+  - Auth: ไม่ต้อง
+
+POST /auth/login
+  - เข้าสู่ระบบ
+  - Params: email, password
+  - Response: { access_token, role }
+  - Auth: ไม่ต้อง
+
+5.2 Analysis (/analysis)
+--------------------------------------------------------------------------------
+POST /analysis/
+  - วิเคราะห์ใบหน้าจากรูป
+  - Body: FormData (file) + Params: gender
+  - Response: {
+      analysis_id, user_id, image_path, gender,
+      face_shape, skin_tone, skin_undertone, personal_color,
+      ethnicity, confidence_score, created_at,
+      palette: { palette_id, season, sub_type, best_colors, avoid_colors, makeup_tips },
+      face_shape_tips: { description, contouring, styles },
+      recommendations: [{ recommendation_id, score, product: {...} }],
+      recommendations_by_category: { "Lipstick": [...], "Eyeshadow": [...] }
+    }
+  - Auth: ต้อง login
+
+GET /analysis/history
+  - ประวัติการวิเคราะห์ของผู้ใช้
+  - Auth: ต้อง login
+
+GET /analysis/{analysis_id}
+  - ดูผลวิเคราะห์เดี่ยว
+  - Auth: ไม่ต้อง
+
+5.3 Products (/products)
+--------------------------------------------------------------------------------
+GET /products/brands
+  - รายการแบรนด์ทั้งหมดที่มีสินค้า active
+  - Auth: ไม่ต้อง
+
+GET /products/categories
+  - รายการหมวดหมู่สินค้า
+  - Auth: ไม่ต้อง
+
+GET /products/
+  - รายการสินค้า (พร้อม filter/search/sort)
+  - Params: skip, limit(50), category_id, brand_id, personal_color, search, sort
+  - sort: "price_asc", "price_desc", "newest"
+  - Auth: ไม่ต้อง
+
+GET /products/similar/{product_id}
+  - สินค้าคล้ายกัน (TF-IDF + Cosine Similarity)
+  - Params: limit (default 6)
+  - Auth: ไม่ต้อง
+
+GET /products/by-category
+  - ค้นหาสินค้าตามชื่อหมวดหมู่
+  - Auth: ไม่ต้อง
+
+GET /products/makeup-recommendations
+  - สินค้าแต่งหน้าตาม parts (lips, eyes, etc.)
+  - Params: parts (comma-separated)
+  - Auth: ไม่ต้อง
+
+GET /products/{product_id}
+  - รายละเอียดสินค้าเดี่ยว
+  - Auth: ไม่ต้อง
+
+POST /products/
+  - สร้างสินค้าใหม่
+  - Auth: ไม่ต้อง
+
+PUT /products/{product_id}
+  - แก้ไขสินค้า
+  - Auth: ไม่ต้อง
+
+DELETE /products/{product_id}
+  - ลบสินค้า
+  - Auth: ไม่ต้อง
+
+POST /products/{product_id}/links
+  - เพิ่ม affiliate link
+  - Auth: ไม่ต้อง
+
+5.4 Recommendations (/recommendations)
+--------------------------------------------------------------------------------
+POST /recommendations/generate/{analysis_id}
+  - สร้าง recommendations จากผลวิเคราะห์
+  - Auth: ไม่ต้อง
+
+GET /recommendations/{analysis_id}
+  - ดู recommendations ของการวิเคราะห์
+  - Auth: ไม่ต้อง
+
+POST /recommendations/feedback/{recommendation_id}
+  - ส่ง like/dislike feedback
+  - Params: rating (like/dislike)
+  - Auth: ต้อง login
+
+POST /recommendations/compare
+  - เปรียบเทียบ color proximity ของ 1-3 สินค้า
+  - Body: { analysis_id, product_ids: [max 3] }
+  - Response: { face_shape, products: { "101": { s2, s4, match_pct } } }
+  - match_pct = clamp((S2 + S4) / 300 * 100, 0, 100)
+  - Auth: ต้อง login
+
+5.5 Profile (/profile)
+--------------------------------------------------------------------------------
+GET /profile/
+  - ดูข้อมูลโปรไฟล์ผู้ใช้
+  - Auth: ต้อง login
+
+PUT /profile/
+  - แก้ไขโปรไฟล์
+  - Params: first_name, last_name, display_name, bio, gender, nationality
+  - Auth: ต้อง login
+
+GET /profile/analyses
+  - ประวัติการวิเคราะห์ (summary)
+  - Auth: ต้อง login
+
+5.6 Commission (/commission)
+--------------------------------------------------------------------------------
+POST /commission/click/{link_id}
+  - Track คลิก affiliate link
+  - Response: { redirect_url }
+  - Auth: ไม่ต้อง
+
+GET /commission/stats
+  - สถิติ commission ทั้งหมด
+  - Response: { total_clicks, total_commission, by_platform: {...} }
+  - Auth: ไม่ต้อง
+
+5.7 Gemini AI (/gemini)
+--------------------------------------------------------------------------------
+POST /gemini/session
+  - สร้าง chat session ใหม่
+  - Params: title
+  - Auth: ต้อง login
+
+POST /gemini/session/{session_id}/chat
+  - ส่งข้อความ + รูป (optional)
+  - Body: FormData (prompt + file)
+  - Response: { response }
+  - Auth: ต้อง login
+
+GET /gemini/session/{session_id}/messages
+  - ดูข้อความทั้งหมดใน session
+  - Auth: ไม่ต้อง
+
+5.8 Landmarks (/landmarks)
+--------------------------------------------------------------------------------
+POST /landmarks/detect
+  - ตรวจจับ 68 จุดใบหน้า (dlib)
+  - Body: FormData (file)
+  - Response: { landmarks: [{x, y}, ...], image_width, image_height, face_rect }
+  - Auth: ไม่ต้อง
+
+5.9 Saved Looks (/looks)
+--------------------------------------------------------------------------------
+GET /looks/categories
+  - รายการหมวดหมู่ looks
+  - Auth: ไม่ต้อง
+
+GET /looks/
+  - Saved looks ของผู้ใช้
+  - Auth: ต้อง login
+
+POST /looks/
+  - บันทึก look ใหม่
+  - Body: { name, category, makeup_data, filter_data }
+  - Auth: ต้อง login
+
+PUT /looks/{look_id}
+  - แก้ไข look
+  - Auth: ต้อง login
+
+DELETE /looks/{look_id}
+  - ลบ look
+  - Auth: ต้อง login
+
+5.10 Behavior Analytics (/behavior)
+--------------------------------------------------------------------------------
+POST /behavior/track
+  - Track single event
+  - Body: { event_type, event_data, page, session_id }
+  - Auth: optional
+
+POST /behavior/track-batch
+  - Track หลาย events พร้อมกัน
+  - Auth: optional
+
+GET /behavior/analytics/summary
+  - สรุปจำนวน events (last N days)
+  - Params: days (default 30)
+  - Auth: ไม่ต้อง
+
+GET /behavior/analytics/top-products
+  - สินค้าที่ถูกดูมากที่สุด
+  - Params: days, limit
+  - Auth: ไม่ต้อง
+
+GET /behavior/analytics/top-searches
+  - คำค้นยอดนิยม
+  - Params: days, limit
+  - Auth: ไม่ต้อง
+
+GET /behavior/analytics/filter-usage
+  - สถิติการใช้ filter
+  - Params: days
+  - Auth: ไม่ต้อง
+
+GET /behavior/analytics/makeup-behavior
+  - พฤติกรรมการแต่งหน้า (สียอดนิยม, preset ยอดนิยม)
+  - Params: days
+  - Auth: ไม่ต้อง
+
+GET /behavior/analytics/personal-color-demand
+  - ความต้องการตาม personal color season
+  - Params: days
+  - Auth: ไม่ต้อง
+
+GET /behavior/analytics/click-funnel
+  - Conversion funnel: views → clicks
+  - Params: days
+  - Auth: ไม่ต้อง
+
+
+================================================================================
+6. Database Schema (35 ตาราง)
+================================================================================
+
+6.1 ตารางที่ใช้งานจริง (18 ตาราง)
+--------------------------------------------------------------------------------
+
+[users]
+  user_id         INT PK AUTO_INCREMENT
+  username        VARCHAR UNIQUE
+  email           VARCHAR UNIQUE
+  password_hash   VARCHAR
+  role            ENUM(admin, user)
+  is_active       TINYINT DEFAULT 1
+  created_at      TIMESTAMP
+
+[user_profiles]
+  profile_id      INT PK AUTO_INCREMENT
+  user_id         INT FK(users) UNIQUE
+  first_name      VARCHAR
+  last_name       VARCHAR
+  display_name    VARCHAR
+  avatar_url      VARCHAR
+  birth_date      DATE
+  gender          ENUM(female, male, non_binary, prefer_not_to_say)
+  nationality     VARCHAR
+  bio             TEXT
+  updated_at      TIMESTAMP
+
+[color_palettes] (12 seasons)
+  palette_id      INT PK AUTO_INCREMENT
+  season          ENUM(spring, summer, autumn, winter)
+  sub_type        ENUM(light, true, bright, soft, deep)
+  description     TEXT
+  best_colors     JSON  { skin_reference: {L,a,b}, colors: [{name,L,a,b,hex},...] }
+  avoid_colors    JSON  { colors: [{name,L,a,b,hex},...] }
+  makeup_tips     TEXT
+  created_at      TIMESTAMP
+
+[analysis_results]
+  analysis_id     INT PK AUTO_INCREMENT
+  user_id         INT FK(users)
+  image_path      VARCHAR
+  gender          ENUM(female, male, non_binary)
+  ethnicity       ENUM(asian, caucasian, african, latino, middle_eastern, south_asian, mixed, other)
+  nationality     VARCHAR
+  face_shape      ENUM(oval, round, square, heart, oblong, diamond, triangle)
+  skin_tone       ENUM(fair, light, medium, tan, dark, deep)
+  skin_undertone  ENUM(warm, cool, neutral)
+  personal_color  ENUM(spring, summer, autumn, winter)
+  palette_id      INT FK(color_palettes)
+  confidence_score FLOAT
+  created_at      TIMESTAMP
+
+[brands]
+  brand_id        INT PK AUTO_INCREMENT
+  name            VARCHAR
+  logo_url        VARCHAR
+  website_url     VARCHAR
+  description     TEXT
+  is_active       TINYINT DEFAULT 1
+  created_at      TIMESTAMP
+
+[product_categories]
+  category_id     INT PK AUTO_INCREMENT
+  name            VARCHAR
+  description     TEXT
+  icon_url        VARCHAR
+
+[products]
+  product_id      INT PK AUTO_INCREMENT
+  brand_id        INT FK(brands)
+  category_id     INT FK(product_categories)
+  name            VARCHAR
+  description     TEXT
+  price           DECIMAL
+  image_url       VARCHAR
+  personal_color  VARCHAR  (comma-separated: spring,summer,autumn,winter)
+  commission_rate DECIMAL
+  is_active       TINYINT DEFAULT 1
+  created_at      TIMESTAMP
+
+[product_links]
+  link_id         INT PK AUTO_INCREMENT
+  product_id      INT FK(products)
+  platform        ENUM(shopee, tiktok, lazada, sephora, watsons, ulta)
+  url             VARCHAR
+  is_active       TINYINT DEFAULT 1
+  created_at      TIMESTAMP
+
+[product_color_shades]
+  shade_id        INT PK AUTO_INCREMENT
+  product_id      INT FK(products)
+  shade_name      VARCHAR
+  shade_code      VARCHAR
+  hex_color       VARCHAR
+  image_url       VARCHAR
+  is_active       TINYINT DEFAULT 1
+
+[recommendation_rules]
+  rule_id         INT PK AUTO_INCREMENT
+  product_id      INT FK(products)
+  face_shape      ENUM(oval, round, square, heart, oblong, diamond, triangle, any)
+  skin_tone       ENUM(fair, light, medium, tan, dark, deep, any)
+  skin_undertone  ENUM(warm, cool, neutral, any)
+  personal_color  ENUM(spring, summer, autumn, winter, any)
+  gender          ENUM(female, male, any)
+  ethnicity       ENUM(asian, caucasian, african, latino, middle_eastern, south_asian, mixed, any)
+  priority        INT (0-10)
+
+[recommendations]
+  recommendation_id  INT PK AUTO_INCREMENT
+  analysis_id        INT FK(analysis_results)
+  product_id         INT FK(products)
+  score              DECIMAL (0-999.99)
+  created_at         TIMESTAMP
+
+[recommendation_feedbacks]
+  feedback_id        INT PK AUTO_INCREMENT
+  recommendation_id  INT FK(recommendations)
+  user_id            INT FK(users)
+  rating             ENUM(like, dislike)
+  created_at         TIMESTAMP
+
+[favorites]
+  favorite_id     INT PK AUTO_INCREMENT
+  user_id         INT FK(users)
+  product_id      INT FK(products)
+  created_at      TIMESTAMP
+  UNIQUE(user_id, product_id)
+
+[click_logs]
+  log_id          INT PK AUTO_INCREMENT
+  link_id         INT FK(product_links)
+  user_id         INT FK(users) NULLABLE
+  platform        ENUM(shopee, tiktok, lazada)
+  ip_address      VARCHAR
+  user_agent      VARCHAR
+  clicked_at      TIMESTAMP
+
+[commissions]
+  commission_id   INT PK AUTO_INCREMENT
+  link_id         INT FK(product_links)
+  user_id         INT FK(users) NULLABLE
+  platform        ENUM(shopee, tiktok, lazada)
+  amount          DECIMAL
+  status          ENUM(pending, confirmed, paid)
+  clicked_at      TIMESTAMP
+
+[user_behaviors]
+  id              INT PK AUTO_INCREMENT
+  user_id         INT FK(users) NULLABLE
+  session_id      VARCHAR
+  event_type      ENUM(product_view, search, filter, click, similar_view, makeup_select, preset_apply)
+  event_data      JSON
+  page            ENUM(products, editor, analyze)
+  created_at      TIMESTAMP
+
+[gemini_sessions]
+  session_id      INT PK AUTO_INCREMENT
+  user_id         INT FK(users)
+  analysis_id     INT FK(analysis_results) NULLABLE
+  title           VARCHAR
+  created_at      TIMESTAMP
+
+[gemini_messages]
+  message_id      INT PK AUTO_INCREMENT
+  session_id      INT FK(gemini_sessions)
+  role            ENUM(user, model)
+  prompt          TEXT
+  response        TEXT
+  image_input     VARCHAR
+  image_output    VARCHAR
+  created_at      TIMESTAMP
+
+[saved_looks]
+  look_id         INT PK AUTO_INCREMENT
+  user_id         INT FK(users)
+  name            VARCHAR
+  category        ENUM(กลางวัน, กลางคืน, ปาร์ตี้, ทำงาน, ลุคเกาหลี, ลุคธรรมชาติ, อื่นๆ)
+  makeup_data     JSON
+  filter_data     JSON
+  thumbnail_url   VARCHAR
+  created_at      TIMESTAMP
+
+
+6.2 ตารางที่ยังไม่ได้ใช้งาน (17 ตาราง)
+--------------------------------------------------------------------------------
+
+[password_resets] — รีเซ็ตรหัสผ่านผ่าน token (forgot password flow)
+  reset_id, user_id(FK), token(UNIQUE), expires_at, created_at
+
+[skin_concerns] — รายการปัญหาผิว (สิว, ริ้วรอย, จุดด่างดำ)
+  concern_id, name, description, icon_url
+
+[user_skin_concerns] — เชื่อมผู้ใช้กับปัญหาผิว + ระดับความรุนแรง
+  id, user_id(FK), concern_id(FK), severity(mild/moderate/severe)
+
+[product_concerns] — เชื่อมสินค้ากับปัญหาผิวที่แก้ได้
+  id, product_id(FK), concern_id(FK)
+
+[product_reviews] — รีวิวสินค้า (rating 1-5, comment, image, platform, verified)
+  review_id, product_id(FK), user_id(FK), rating, comment, image_url, platform, is_verified, created_at
+
+[analysis_reviews] — ผู้ใช้ยืนยันผลวิเคราะห์ตรงหรือไม่
+  review_id, analysis_id(FK), user_id(FK), is_accurate, comment, created_at
+
+[notifications] — แจ้งเตือนผู้ใช้
+  notification_id, user_id(FK), title, message, type(recommendation/promotion/system/review), is_read, created_at
+
+[banners] — แบนเนอร์โปรโมชั่น
+  banner_id, title, image_url, link_url, position(home_top/home_middle/sidebar), starts_at, ends_at, is_active, created_at
+
+[search_histories] — ประวัติคำค้นหา
+  search_id, user_id(FK), keyword, created_at
+
+[admin_logs] — Audit trail ของ admin
+  log_id, admin_id(FK), action, table_name, record_id, old_value(JSON), new_value(JSON), ip_address, created_at
+
+[blog_categories] — หมวดหมู่บทความ
+  category_id, name, description, created_at
+
+[blog_posts] — บทความ
+  post_id, category_id(FK), author_id(FK), title, slug(UNIQUE), content, thumbnail_url, views, is_published, published_at, created_at, updated_at
+
+[edit_filters] — Filter presets (ตอนนี้ hardcode ใน frontend)
+  filter_id, name, category(beauty/color/light/vintage/makeup), thumbnail_url, config(JSON), is_active, created_at
+
+[edit_stickers] — Sticker แปะรูป
+  sticker_id, name, category(face/decoration/text/emoji), image_url, is_active, created_at
+
+[photo_edits] — ประวัติแก้ไขรูป
+  edit_id, user_id(FK), original_image, edited_image, edit_config(JSON), source(upload/analysis/gemini), created_at
+
+[product_tags] — Tag สินค้า (เช่น waterproof, vegan, SPF)
+  tag_id, name(UNIQUE)
+
+[product_tag_map] — เชื่อม product <-> tag (many-to-many)
+  id, product_id(FK), tag_id(FK)
+
+
+================================================================================
+7. Services (Business Logic)
+================================================================================
+
+7.1 ai_service.py — Face Analysis Pipeline
+--------------------------------------------------------------------------------
+หน้าที่: ประสานงานการวิเคราะห์ใบหน้าทั้งหมด
+
+ฟังก์ชันหลัก:
+- analyze_face(image_path, gender, db_session)
+  * เรียก _run_facemesh() ครั้งเดียว → ได้ landmarks (468 จุด), bounding box, face crop
+  * ส่ง face crop ไป detect_face_shape()
+  * ส่ง bounding box ไป extract_skin_lab_from_bbox()
+  * เรียก get_personal_color() เพื่อ match season
+
+- detect_face_shape(rgb_image, facemesh_data)
+  * CNN path (primary): ใช้ face crop + models_ai/face_shape_cnn.h5
+  * Geometry fallback: ใช้ MediaPipe landmark ratios
+
+- detect_skin_tone(rgb_image) → (tone, undertone)
+  * แยกสีผิวหลักใน CIELAB
+  * จำแนก tone จาก L* / undertone จาก a*, b*
+
+- get_personal_color(skin_tone, undertone, skin_lab, db_session)
+  * CIEDE2000 matching กับ ColorPalette references (primary)
+  * Fallback: legacy lookup table
+
+Geometry Decision Tree Thresholds:
+  ratio = face_height / cheekbone_width  (landmarks 152↔10 / 234↔454)
+  jaw_ratio = jaw_width / cheekbone_width  (landmarks 172↔397 / 234↔454)
+  temple_ratio = temple_width / cheekbone  (landmarks 127↔356 / 234↔454)
+
+  ratio > 1.5                          → oblong
+  1.3 < ratio <= 1.5:
+    jaw_ratio < 0.75                   → heart
+    temple_ratio < 0.85               → diamond
+    else                               → oval
+  1.0 < ratio <= 1.3:
+    jaw_ratio > 0.9                   → square
+    jaw_ratio < 0.75                  → heart
+    temple_ratio < 0.85              → diamond
+    else                               → oval
+  ratio <= 1.0:
+    jaw_ratio > 0.9                   → square
+    else                               → round
+  no face detected                     → oval (default)
+
+FACE_SHAPE_TIPS: ข้อมูล contouring & styling สำหรับแต่ละรูปหน้า
+
+
+7.2 color_analysis_service.py — CIELAB Color Science
+--------------------------------------------------------------------------------
+หน้าที่: การวิเคราะห์สีทั้งหมดใน CIELAB color space
+
+ฟังก์ชัน:
+- rgb_to_lab(rgb_pixels) → CIELAB array
+  * sRGB → XYZ (D65) → L*a*b* via colour-science library
+
+- extract_skin_lab(rgb_image) → (L, a, b)
+  * Crop center region
+  * K-Means clustering (k=3)
+  * Return centroid of largest cluster
+
+- extract_skin_lab_from_bbox(rgb_image, bbox) → (L, a, b)
+  * Crop cheek region (middle third of face bbox)
+  * K-Means clustering (k=6)
+  * Filter outlier pixels (L* < 20 or > 95)
+
+- classify_tone_from_lab(L) → str
+  * L > 78: fair
+  * 68 < L <= 78: light
+  * 58 < L <= 68: medium
+  * 48 < L <= 58: tan
+  * 38 < L <= 48: dark
+  * L <= 38: deep
+
+- classify_undertone_from_lab(a, b) → str
+  * b > 20 AND a > 8: warm
+  * b < 12 OR (a > 12 AND b < 16): cool
+  * else: neutral
+
+- load_palette_references(db_session) → list
+  * Query ColorPalette → extract skin_reference centroids
+  * Module-level cache
+
+- match_season_by_delta_e(skin_lab, palette_refs) → (season, palette_id, confidence)
+  * CIEDE2000 distance จาก skin ไปทุก palette reference
+  * Return ที่ใกล้ที่สุด + confidence (50-99%)
+
+
+7.3 scoring_service.py — Multi-Signal Recommendation Scoring
+--------------------------------------------------------------------------------
+หน้าที่: คำนวณคะแนนแนะนำสินค้า 6 สัญญาณ
+
+Signal  Range      Description
+------  ---------  -----------
+S1      0-300      Rule Match Priority (จาก RecommendationRule.priority)
+S2      0-300      CIEDE2000 Proximity (ความใกล้สีสินค้ากับ palette best_colors)
+S3      0-150      Seasonal Match (ตรง personal color season = 150, ไม่มีข้อมูล = 75, ไม่ตรง = 0)
+S4      -100 to 0  Avoid-Color Penalty (สินค้าใกล้สีควรหลีกเลี่ยง, trigger เมื่อ delta_E < 15)
+S5      0-100      Feedback Aggregation (like/dislike ratio จากผู้ใช้ personal color เดียวกัน)
+S6      0-50       Popularity (จำนวน favorites, cap ที่ 10)
+
+Final = clamp(S1 + S2 + S3 + S4 + S5 + S6, 0, 999.99)
+
+ฟังก์ชัน:
+- hex_to_lab(hex_color) → (L, a, b)  [cached]
+- compute_color_proximity(shades_lab, palette_lab) → 0-300
+  * delta_E=0 → 300, delta_E>=50 → 0
+- compute_avoid_penalty(shades_lab, avoid_lab) → -100 to 0
+- compute_personal_color_score(product_pc, analysis_pc) → 0/75/150
+- compute_final_score(s1, s2, s3, s4, s5, s6) → 0-999.99
+- batch_feedback_scores(product_ids, personal_color, db) → dict {product_id: S5}
+- batch_popularity_scores(product_ids, db) → dict {product_id: S6}
+
+
+7.4 recommendation_service.py — TF-IDF Product Similarity
+--------------------------------------------------------------------------------
+หน้าที่: หาสินค้าคล้ายกัน
+
+Algorithm: TF-IDF + Cosine Similarity over product metadata
+
+Text Tokenization: Regex แยก Thai (ก-๙) + English (a-z) words
+
+Document Building (per product):
+  - Product name (weight 3x)
+  - Description (weight 2x)
+  - Category (weight 2x)
+  - Brand (weight 2x)
+
+ฟังก์ชัน:
+- get_similar_products(target_product, all_products, top_n=6) → list[dict]
+  * Return top N products with similarity_score (0.0-1.0)
+
+
+7.5 landmark_service.py — Face Landmark Detection
+--------------------------------------------------------------------------------
+หน้าที่: ตรวจจับจุดบนใบหน้าสำหรับ Photo Editor
+
+- detect_landmarks(image_path) → dict
+  * ใช้ dlib shape_predictor_68_face_landmarks.dat
+  * Return normalized (0-1) landmark coordinates
+  * + face bounding box + image dimensions
+
+
+7.6 gemini_service.py — Google Generative AI
+--------------------------------------------------------------------------------
+หน้าที่: เชื่อมต่อ Gemini API
+
+- async generate_with_gemini(prompt, image_path=None) → (text, image)
+  * Model: Gemini 2.0 Flash
+  * รับ text + optional image
+  * Return text response
+
+
+================================================================================
+8. ระบบ User Behavior Tracking
+================================================================================
+
+Events ที่ track:
+  - product_view    : ดูสินค้า
+  - search          : ค้นหา
+  - filter          : ใช้ filter
+  - click           : คลิก affiliate link
+  - similar_view    : ดูสินค้าคล้ายกัน
+  - makeup_select   : เลือกสีแต่งหน้า
+  - preset_apply    : ใช้ preset look
+  - face_analysis   : วิเคราะห์ใบหน้า
+  - photo_download  : ดาวน์โหลดรูปที่แต่ง
+
+การทำงาน (tracker.js):
+  - สร้าง unique session_id ใน sessionStorage
+  - Batch events (flush ทุก 3 วินาที หรือ 10 events)
+  - ส่งไป POST /behavior/track-batch
+
+Analytics endpoints (ฝั่ง admin):
+  - summary        : จำนวน events รวม
+  - top-products   : สินค้ายอดนิยม
+  - top-searches   : คำค้นยอดนิยม
+  - filter-usage   : สถิติ filter
+  - makeup-behavior: สี/preset ยอดนิยม
+  - personal-color-demand: ความต้องการตาม season
+  - click-funnel   : conversion funnel (views → clicks)
+
+
+================================================================================
+9. ระบบ Affiliate Commission
+================================================================================
+
+Platform ที่รองรับ: Shopee, TikTok Shop, Lazada
+
+Flow:
+  1. ผู้ใช้คลิกลิงก์สินค้า
+  2. Frontend เรียก POST /commission/click/{link_id}
+  3. Backend สร้าง ClickLog record
+  4. Backend สร้าง Commission record (status: pending)
+  5. Return redirect_url ไปยัง platform
+
+Commission Status: pending → confirmed → paid
+
+Admin Dashboard:
+  - Total clicks ทั้งหมด
+  - Total commission (THB)
+  - แยกตาม platform (clicks + commission)
+
+
+================================================================================
+10. ระบบ Photo Editor
+================================================================================
+
+9 ส่วนแต่งหน้า:
+  1. Lips (ปาก)       - 12 สี + intensity slider
+  2. Eyes (ตา)        - 10 สี
+  3. Eyeliner         - 8 สี
+  4. Eyebrows (คิ้ว)  - 8 สี
+  5. Lashes (ขนตา)    - 8 สี
+  6. Nose (จมูก)      - 8 สี (contouring)
+  7. Blush (บลัช)     - 10 สี
+  8. Highlight        - 8 สี
+  9. Foundation       - 10 สี
+
+8 Preset Filters:
+  Normal, Bright, Soft, Vintage, Sharp, B&W, Vivid, Rose
+
+Manual Adjustments: Brightness, Contrast, Saturation (sliders)
+
+8 Preset Looks:
+  Korean Natural, Glam Night, Soft Girl, Office Day
+  Sunset Glow, Berry Queen, Fresh No-Makeup, Red Carpet
+
+Canvas Rendering:
+  - ใช้ dlib 68-point landmarks
+  - วาดด้วย Canvas 2D context
+  - Bezier curves + radial gradients
+  - globalAlpha สำหรับ transparency
+
+ฟีเจอร์เพิ่มเติม:
+  - Before/After toggle
+  - บันทึก/โหลด/ลบ looks
+  - ดาวน์โหลดรูป
+  - Product recommendations ตามส่วนที่แต่ง
+  - Makeup tips 4 tips ต่อหมวด
+
+
+================================================================================
+11. Color Science Rules
+================================================================================
+
+กฎเหล่านี้บังคับสำหรับทุก code ที่เกี่ยวกับสีผิว:
+
+1. ใช้ CIELAB (L*a*b*) color space เท่านั้น — ห้ามใช้ raw RGB
+2. ใช้ CIEDE2000 (Delta E00) สำหรับ color distance — ห้ามใช้ CIE76 หรือ CIE94
+3. จำแนก skin tone จาก L* (lightness) — ห้ามใช้ RGB brightness
+4. จำแนก undertone จาก a* และ b* — ห้ามใช้ r-b difference
+5. Season matching ต้องใช้ Delta E กับ palette skin_reference centroids
+6. Color palette data ต้องเก็บใน CIELAB format {L, a, b}
+7. ใช้ colour-science library เป็นหลัก (sRGB → XYZ D65 → L*a*b*)
+8. Legacy fallback ใน get_personal_color() ยังเก็บ lookup dict ไว้
+
+
+================================================================================
+12. Product Comparison Rules
+================================================================================
+
+1. เปรียบเทียบได้สูงสุด 3 สินค้า (backend + frontend validate)
+2. Color Match % = clamp((S2 + S4) / 300 * 100, 0, 100)
+   - S2 = CIEDE2000 proximity (0-300)
+   - S4 = avoid-color penalty (-100 to 0)
+3. UI labels ทั้งหมดเป็นภาษาไทย
+4. Face shape tips ใช้ FACE_SHAPE_TIPS_TH + FACE_SHAPE_NAMES_TH
+5. ห้ามใช้ text-transform: uppercase ใน comparison table
+6. Graceful degradation: Color Match + Face Shape Tips แสดงเฉพาะเมื่อมีผลวิเคราะห์
+
+
+================================================================================
+13. Authentication & Security
+================================================================================
+
+Auth Flow:
+  1. POST /auth/login → { access_token (JWT), role }
+  2. Frontend เก็บ token + role ใน localStorage
+  3. Axios interceptor แนบ Authorization: Bearer {token} ทุก request
+  4. Backend decode JWT → get user_id + role
+  5. Protected routes ใช้ Depends(get_current_user)
+
+JWT Config:
+  - Algorithm: HS256
+  - Expire: 1440 นาที (24 ชั่วโมง)
+  - Secret: จาก environment variable SECRET_KEY
+
+Password: bcrypt hash via passlib
+
+AuthContext (React):
+  - login(token, role) → set user + localStorage
+  - logout() → clear user + localStorage
+  - useAuth() hook → access auth state
+
+
+================================================================================
+14. Development Commands
+================================================================================
+
+Frontend (frontendauramatchnewversion/):
+  npm run dev        # Dev server on port 5175
+  npm run build      # Production build to dist/
+  npm run lint       # ESLint
+  npm run preview    # Preview production build
+
+Backend (backendauramatchnewversion/):
+  pip install -r requirements.txt
+  uvicorn main:app --reload --host 0.0.0.0 --port 8001
+  python3 -m pytest tests/ -v                              # Run all tests
+  python3 -m pytest tests/test_color_analysis_service.py -v # Color science (67 tests)
+  python3 -m pytest tests/test_face_shape_decision_tree.py -v # Face shape (39 tests)
+
+Database:
+  MySQL database: auramatchnewversion
+  Schema: auramatch.sql
+  Seed: seed_makeup_products.sql, seed_personal_color.sql
+  Seed 12-season palettes: python scripts/seed_color_palettes.py
+
+Vite Proxy:
+  /api/* → http://localhost:8001 (strip /api prefix)
+
+CORS Origins:
+  http://localhost:5173, 5175, 5177, 3000
+
+
+================================================================================
+15. Environment Variables
+================================================================================
+
+DB_HOST              # MySQL host (default: localhost)
+DB_PORT              # MySQL port (default: 3306)
+DB_USER              # MySQL user (default: root)
+DB_PASSWORD          # MySQL password
+DB_NAME              # Database name (default: auramatchnewversion)
+SECRET_KEY           # JWT secret (default: "secret")
+ALGORITHM            # JWT algorithm (default: HS256)
+ACCESS_TOKEN_EXPIRE_MINUTES  # Token TTL (default: 1440)
+GEMINI_API_KEY       # Google Generative AI key
+UPLOAD_DIR           # Upload directory (default: "uploads")
+
+
+================================================================================
+16. Dependencies
+================================================================================
+
+Frontend (package.json):
+  react              19.2.4
+  react-dom          19.2.4
+  react-router-dom   7.13.2
+  axios              1.14.0
+  lucide-react       1.7.0
+  react-webcam       7.2.0
+  tailwindcss        4.2.2
+  @tailwindcss/vite  4.2.2
+  @vitejs/plugin-react 6.0.1
+
+Backend (requirements.txt):
+  fastapi            0.111.0
+  uvicorn            0.29.0
+  sqlalchemy         2.0.30
+  pymysql            1.1.1
+  cryptography       42.0.7
+  python-dotenv      1.0.1
+  pydantic           2.7.1
+  pydantic-settings  2.2.1
+  python-multipart   0.0.9
+  passlib[bcrypt]    1.7.4
+  python-jose[cryptography] 3.3.0
+  Pillow             10.3.0
+  opencv-python      4.9.0.80
+  mediapipe          0.10.14
+  numpy              1.26.4
+  google-generativeai 0.5.4
+  dlib               19.24.4
+  scikit-learn       1.4.2
+  colour-science     0.4.4
+
+
+================================================================================
+17. Testing
+================================================================================
+
+Test Files:
+  tests/test_color_analysis_service.py    # 67 tests
+    - TestRgbToLab
+    - TestExtractSkinLab
+    - TestClassifyToneFromLab
+    - TestClassifyUndertoneFromLab
+    - TestMatchSeasonByDeltaE
+    - TestPipelineSnapshots
+
+  tests/test_face_shape_decision_tree.py  # 39 tests
+    - TestOblong
+    - TestHighRatio
+    - TestMidRatio
+    - TestLowRatio
+    - TestEdgeCases
+    - TestAllShapesReachable
+    Note: triangle shape unreachable via geometry (CNN-only)
+
+  tests/test_scoring_service.py
+    - TestHexToLab
+    - TestColorProximity
+    - TestAvoidPenalty
+    - TestPersonalColorScore
+    - TestFinalScore
+
+Run: python3 -m pytest tests/ -v
+
+
+================================================================================
+                              จบข้อมูลทั้งหมด
+================================================================================

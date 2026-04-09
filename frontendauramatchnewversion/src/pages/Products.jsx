@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import api from '../api/axios'
-import { ShoppingBag, ExternalLink, Search, SlidersHorizontal, ChevronDown, X, Loader2, Sparkles, ArrowLeft, Scale, Check } from 'lucide-react'
+import api, { favoritesApi, skinConcernsApi, reviewsApi } from '../api/axios'
+import { useAuth } from '../context/AuthContext'
+import { ShoppingBag, ExternalLink, Search, SlidersHorizontal, ChevronDown, X, Loader2, Sparkles, ArrowLeft, Scale, Check, Heart, ShieldCheck, Star, MessageSquare, Trash2 } from 'lucide-react'
 import { trackProductView, trackSearch, trackFilter, trackClick, trackSimilarView } from '../services/tracker'
 import './Products.css'
 
@@ -21,11 +22,30 @@ export default function Products() {
   // Compare
   const [compareList, setCompareList] = useState([])
   const [showCompare, setShowCompare] = useState(false)
+  const [latestAnalysisId, setLatestAnalysisId] = useState(null)
+  const [compareScores, setCompareScores] = useState({})
+  const [compareFaceShape, setCompareFaceShape] = useState(null)
+  const [loadingCompare, setLoadingCompare] = useState(false)
 
   // Similar products (TF-IDF)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [similarProducts, setSimilarProducts] = useState([])
   const [loadingSimilar, setLoadingSimilar] = useState(false)
+
+  // Favorites
+  const { user } = useAuth()
+  const [favoriteIds, setFavoriteIds] = useState(new Set())
+
+  // User skin concerns
+  const [userConcernIds, setUserConcernIds] = useState(new Set())
+
+  // Product detail + reviews
+  const [detailProduct, setDetailProduct] = useState(null)
+  const [reviews, setReviews] = useState([])
+  const [reviewSummary, setReviewSummary] = useState(null)
+  const [loadingReviews, setLoadingReviews] = useState(false)
+  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' })
+  const [submittingReview, setSubmittingReview] = useState(false)
 
   const COSMETIC_CATEGORY_IDS = [1, 2, 3, 4, 5, 6, 7]
 
@@ -35,6 +55,17 @@ export default function Products() {
     }).catch(() => {})
     api.get('/products/brands').then(res => setBrands(res.data)).catch(() => {})
   }, [])
+
+  // Load favorite IDs and user concerns when logged in
+  useEffect(() => {
+    if (!user) { setFavoriteIds(new Set()); setUserConcernIds(new Set()); return }
+    favoritesApi.getIds()
+      .then(res => setFavoriteIds(new Set(res.data)))
+      .catch(() => {})
+    skinConcernsApi.getMine()
+      .then(res => setUserConcernIds(new Set(res.data.map(c => c.concern_id))))
+      .catch(() => {})
+  }, [user])
 
   useEffect(() => {
     setLoading(true)
@@ -64,6 +95,31 @@ export default function Products() {
   useEffect(() => {
     if (selectedColor) trackFilter('personal_color', selectedColor)
   }, [selectedColor])
+
+  // Fetch latest analysis for compare scoring
+  useEffect(() => {
+    api.get('/profile/analyses')
+      .then(res => {
+        if (res.data?.length > 0) setLatestAnalysisId(res.data[0].analysis_id)
+      })
+      .catch(() => {})
+  }, [])
+
+  // Fetch S2/S4 compare scores when modal opens
+  useEffect(() => {
+    if (!showCompare || !latestAnalysisId || compareList.length < 2) return
+    setLoadingCompare(true)
+    api.post('/recommendations/compare', {
+      analysis_id: latestAnalysisId,
+      product_ids: compareList.map(p => p.product_id)
+    })
+      .then(res => {
+        setCompareScores(res.data.products || {})
+        setCompareFaceShape(res.data.face_shape || null)
+      })
+      .catch(() => { setCompareScores({}); setCompareFaceShape(null) })
+      .finally(() => setLoadingCompare(false))
+  }, [showCompare, latestAnalysisId, compareList])
 
   const handleClickLink = async (product, linkId, platform, url) => {
     trackClick(product, platform, url)
@@ -101,12 +157,92 @@ export default function Products() {
 
   const isInCompare = (productId) => compareList.some(p => p.product_id === productId)
 
+  const toggleFavorite = async (productId) => {
+    if (!user) return
+    const isFav = favoriteIds.has(productId)
+    // Optimistic update
+    setFavoriteIds(prev => {
+      const next = new Set(prev)
+      if (isFav) next.delete(productId)
+      else next.add(productId)
+      return next
+    })
+    try {
+      if (isFav) await favoritesApi.remove(productId)
+      else await favoritesApi.add(productId)
+    } catch {
+      // Revert on error
+      setFavoriteIds(prev => {
+        const next = new Set(prev)
+        if (isFav) next.add(productId)
+        else next.delete(productId)
+        return next
+      })
+    }
+  }
+
   const clearFilters = () => {
     setSearch('')
     setSelectedCategory(null)
     setSelectedBrand(null)
     setSelectedColor(null)
     setSort('newest')
+  }
+
+  const openDetail = async (product) => {
+    setDetailProduct(product)
+    setLoadingReviews(true)
+    setReviewForm({ rating: 0, comment: '' })
+    try {
+      const [revRes, sumRes] = await Promise.all([
+        reviewsApi.getForProduct(product.product_id),
+        reviewsApi.getSummary(product.product_id),
+      ])
+      setReviews(revRes.data)
+      setReviewSummary(sumRes.data)
+    } catch {
+      setReviews([])
+      setReviewSummary(null)
+    } finally {
+      setLoadingReviews(false)
+    }
+  }
+
+  const closeDetail = () => {
+    setDetailProduct(null)
+    setReviews([])
+    setReviewSummary(null)
+  }
+
+  const refreshReviews = async (productId) => {
+    const [revRes, sumRes] = await Promise.all([
+      reviewsApi.getForProduct(productId),
+      reviewsApi.getSummary(productId),
+    ])
+    setReviews(revRes.data)
+    setReviewSummary(sumRes.data)
+  }
+
+  const submitReview = async () => {
+    if (!user || reviewForm.rating === 0) return
+    setSubmittingReview(true)
+    try {
+      await reviewsApi.submit(detailProduct.product_id, {
+        rating: reviewForm.rating,
+        comment: reviewForm.comment || null,
+      })
+      await refreshReviews(detailProduct.product_id)
+      setReviewForm({ rating: 0, comment: '' })
+    } catch { }
+    finally { setSubmittingReview(false) }
+  }
+
+  const deleteReview = async () => {
+    if (!user) return
+    try {
+      await reviewsApi.remove(detailProduct.product_id)
+      await refreshReviews(detailProduct.product_id)
+    } catch { }
   }
 
   const hasFilters = search || selectedCategory || selectedBrand || selectedColor || sort !== 'newest'
@@ -117,6 +253,21 @@ export default function Products() {
     { id: 'autumn', label: 'ออทั่ม (โทนอุ่นเข้ม)', emoji: '🍂', color: '#f97316' },
     { id: 'winter', label: 'วินเทอร์ (โทนเย็นสด)', emoji: '❄️', color: '#8b5cf6' },
   ]
+
+  const FACE_SHAPE_TIPS_TH = {
+    oval:     { contour: 'คอนทัวร์เบาๆ บริเวณโหนกแก้ม', styles: 'เหมาะกับทุกทรง' },
+    round:    { contour: 'คอนทัวร์แนวกราม และขมับ', styles: 'กรอบเหลี่ยม, หน้าม้าปัดข้าง' },
+    square:   { contour: 'ทำมุมกรามให้นุ่มลง', styles: 'ผมเลเยอร์, แสกข้าง' },
+    heart:    { contour: 'คอนทัวร์ข้างหน้าผาก', styles: 'หน้าม้าปัดข้าง, เลเยอร์ระดับคาง' },
+    oblong:   { contour: 'เพิ่มความกว้างที่โหนกแก้ม', styles: 'หน้าม้าปัดข้าง, ผมเลเยอร์' },
+    diamond:  { contour: 'ลดความเด่นของโหนกแก้ม', styles: 'หน้าม้าปัดข้าง, ทรงระดับคาง' },
+    triangle: { contour: 'เพิ่มความกว้างที่ขมับ', styles: 'เพิ่มวอลุ่มด้านบน, หน้าม้าปัดข้าง' },
+  }
+
+  const FACE_SHAPE_NAMES_TH = {
+    oval: 'รูปไข่', round: 'กลม', square: 'เหลี่ยม', heart: 'หัวใจ',
+    oblong: 'ยาว', diamond: 'เพชร', triangle: 'สามเหลี่ยม',
+  }
 
   return (
     <div className="pd">
@@ -185,6 +336,129 @@ export default function Products() {
                         </div>
                       )}
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Product Detail + Review Modal */}
+      {detailProduct && (
+        <div className="pd-similar-overlay" onClick={closeDetail}>
+          <div className="pd-detail-modal" onClick={e => e.stopPropagation()}>
+            <div className="pd-similar-header">
+              <button className="pd-similar-back" onClick={closeDetail}><ArrowLeft size={18} /></button>
+              <h2 className="pd-similar-title"><MessageSquare size={16} /> รายละเอียดและรีวิว</h2>
+            </div>
+
+            {/* Product Info */}
+            <div className="pd-detail-header">
+              {detailProduct.image_url && <img src={detailProduct.image_url} alt="" className="pd-detail-img" />}
+              <div className="pd-detail-info">
+                {detailProduct.brand_name && <span className="pd-card-brand">{detailProduct.brand_name}</span>}
+                <h3 className="pd-detail-name">{detailProduct.name}</h3>
+                {detailProduct.price > 0 && <span className="pd-detail-price">฿{detailProduct.price.toLocaleString()}</span>}
+                {detailProduct.personal_color && (
+                  <div className="pd-card-seasons">
+                    {detailProduct.personal_color.split(',').map(s => {
+                      const pc = PERSONAL_COLORS.find(c => c.id === s.trim())
+                      return pc ? <span key={pc.id} className={`pd-season-dot pd-season-dot--${pc.id}`} title={pc.label}>{pc.emoji}</span> : null
+                    })}
+                  </div>
+                )}
+                {detailProduct.links?.length > 0 && (
+                  <div className="pd-card-links">
+                    {detailProduct.links.map(link => (
+                      <button key={link.link_id}
+                        onClick={() => handleClickLink(detailProduct, link.link_id, link.platform, link.url)}
+                        className={`pd-link pd-link--${link.platform}`}>
+                        <ExternalLink size={11} /> {link.platform.charAt(0).toUpperCase() + link.platform.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Review Summary */}
+            {loadingReviews ? (
+              <div className="pd-review-loading"><Loader2 size={20} className="pd-spin" /> กำลังโหลดรีวิว...</div>
+            ) : reviewSummary && (
+              <div className="pd-review-summary">
+                <div className="pd-review-avg-section">
+                  <span className="pd-review-avg">{reviewSummary.average_rating > 0 ? reviewSummary.average_rating.toFixed(1) : '-'}</span>
+                  <div className="pd-review-avg-detail">
+                    <div className="pd-review-stars">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Star key={i} size={14} className={i <= Math.round(reviewSummary.average_rating) ? 'pd-review-star--filled' : 'pd-review-star--empty'} fill={i <= Math.round(reviewSummary.average_rating) ? 'currentColor' : 'none'} />
+                      ))}
+                    </div>
+                    <span className="pd-review-total">{reviewSummary.total_count} รีวิว</span>
+                  </div>
+                </div>
+                {reviewSummary.total_count > 0 && (
+                  <div className="pd-review-dist">
+                    {[5, 4, 3, 2, 1].map(star => (
+                      <div key={star} className="pd-review-dist-row">
+                        <span className="pd-review-dist-label">{star}</span>
+                        <div className="pd-review-dist-bar">
+                          <div className="pd-review-dist-fill" style={{ width: `${reviewSummary.total_count > 0 ? (reviewSummary.distribution[star] / reviewSummary.total_count) * 100 : 0}%` }} />
+                        </div>
+                        <span className="pd-review-dist-count">{reviewSummary.distribution[star]}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Review Form (auth only) */}
+            {user && !loadingReviews && (
+              <div className="pd-review-form">
+                <h4 className="pd-review-form-title">เขียนรีวิว</h4>
+                <div className="pd-review-form-stars">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <button key={i} className="pd-review-star-btn" onClick={() => setReviewForm(f => ({ ...f, rating: i }))}>
+                      <Star size={22} className={i <= reviewForm.rating ? 'pd-review-star--filled' : 'pd-review-star--empty'} fill={i <= reviewForm.rating ? 'currentColor' : 'none'} />
+                    </button>
+                  ))}
+                </div>
+                <textarea className="pd-review-textarea" rows={3} placeholder="แชร์ประสบการณ์ของคุณ..." value={reviewForm.comment} onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))} />
+                <button className="pd-review-submit" onClick={submitReview} disabled={submittingReview || reviewForm.rating === 0}>
+                  {submittingReview ? <Loader2 size={14} className="pd-spin" /> : <Star size={14} />}
+                  ส่งรีวิว
+                </button>
+              </div>
+            )}
+
+            {/* Review List */}
+            {!loadingReviews && (
+              <div className="pd-review-list">
+                {reviews.length === 0 ? (
+                  <div className="pd-review-empty">
+                    <MessageSquare size={24} />
+                    <p>ยังไม่มีรีวิว</p>
+                  </div>
+                ) : reviews.map(r => (
+                  <div key={r.review_id} className="pd-review-item">
+                    <div className="pd-review-item-header">
+                      <div className="pd-review-author">
+                        <span className="pd-review-author-name">{r.username}</span>
+                        {r.is_verified === 1 && <ShieldCheck size={12} className="pd-review-verified" />}
+                      </div>
+                      <span className="pd-review-date">{r.created_at?.split(' ')[0]}</span>
+                    </div>
+                    <div className="pd-review-stars">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Star key={i} size={12} className={i <= r.rating ? 'pd-review-star--filled' : 'pd-review-star--empty'} fill={i <= r.rating ? 'currentColor' : 'none'} />
+                      ))}
+                    </div>
+                    {r.comment && <p className="pd-review-comment">{r.comment}</p>}
+                    {user && r.user_id === user.user_id && (
+                      <button className="pd-review-delete" onClick={deleteReview}><Trash2 size={12} /> ลบรีวิว</button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -288,7 +562,7 @@ export default function Products() {
         ) : (
           <div className="pd-grid">
             {products.map(product => (
-              <div key={product.product_id} className="pd-card" onMouseEnter={() => trackProductView(product)}>
+              <div key={product.product_id} className="pd-card" onClick={() => openDetail(product)} onMouseEnter={() => trackProductView(product)} style={{ cursor: 'pointer' }}>
                 <div className="pd-card-img-wrap">
                   {product.image_url ? (
                     <img src={product.image_url} alt={product.name} className="pd-card-img" />
@@ -297,6 +571,15 @@ export default function Products() {
                   )}
                   {product.price > 0 && <span className="pd-card-price">฿{product.price.toLocaleString()}</span>}
                   {product.category_name && <span className="pd-card-cat">{product.category_name}</span>}
+                  {user && (
+                    <button
+                      className={`pd-fav-btn ${favoriteIds.has(product.product_id) ? 'pd-fav-btn--active' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); toggleFavorite(product.product_id) }}
+                      aria-label={favoriteIds.has(product.product_id) ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'}
+                    >
+                      <Heart size={18} fill={favoriteIds.has(product.product_id) ? 'currentColor' : 'none'} />
+                    </button>
+                  )}
                 </div>
                 <div className="pd-card-body">
                   {product.brand_name && <span className="pd-card-brand">{product.brand_name}</span>}
@@ -310,11 +593,24 @@ export default function Products() {
                       })}
                     </div>
                   )}
+                  {product.concerns?.length > 0 && (
+                    <div className="pd-card-concerns">
+                      {product.concerns.map(c => {
+                        const isMatch = userConcernIds.has(c.concern_id)
+                        return (
+                          <span key={c.concern_id} className={`pd-concern-badge ${isMatch ? 'pd-concern-badge--match' : ''}`}>
+                            {isMatch && <ShieldCheck size={10} />}
+                            {c.name}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
                   <div className="pd-card-actions">
                     {product.links?.length > 0 && (
                       <div className="pd-card-links">
                         {product.links.map(link => (
-                          <button key={link.link_id} onClick={() => handleClickLink(product, link.link_id, link.platform, link.url)}
+                          <button key={link.link_id} onClick={(e) => { e.stopPropagation(); handleClickLink(product, link.link_id, link.platform, link.url) }}
                             className={`pd-link pd-link--${link.platform}`}>
                             <ExternalLink size={11} /> {link.platform.charAt(0).toUpperCase() + link.platform.slice(1)}
                           </button>
@@ -322,11 +618,11 @@ export default function Products() {
                       </div>
                     )}
                     <div className="pd-card-btns">
-                      <button className="pd-similar-btn" onClick={() => handleViewSimilar(product)}>
+                      <button className="pd-similar-btn" onClick={(e) => { e.stopPropagation(); handleViewSimilar(product) }}>
                         <Sparkles size={12} /> สินค้าคล้ายกัน
                       </button>
                       <button className={`pd-compare-btn ${isInCompare(product.product_id) ? 'pd-compare-btn--active' : ''}`}
-                        onClick={() => toggleCompare(product)}>
+                        onClick={(e) => { e.stopPropagation(); toggleCompare(product) }}>
                         {isInCompare(product.product_id) ? <><Check size={12} /> เลือกแล้ว</> : <><Scale size={12} /> เปรียบเทียบ</>}
                       </button>
                     </div>
@@ -403,6 +699,49 @@ export default function Products() {
                       </td>
                     ))}
                   </tr>
+                  {latestAnalysisId && (
+                    <tr>
+                      <td className="pd-compare-label">ความเข้ากันของสี</td>
+                      {compareList.map(p => {
+                        const score = compareScores[p.product_id]
+                        const pct = score ? Math.round(score.match_pct) : null
+                        return (
+                          <td key={p.product_id} className="pd-compare-val">
+                            {loadingCompare ? (
+                              <span className="pd-compare-loading-text">กำลังคำนวณ...</span>
+                            ) : pct !== null ? (
+                              <div className="pd-compare-match">
+                                <div className="pd-compare-match-bar">
+                                  <div className="pd-compare-match-fill"
+                                    style={{ width: `${pct}%`, background: pct >= 70 ? 'var(--pd-gold)' : pct >= 40 ? 'var(--pd-warm-gray)' : 'var(--pd-rose)' }} />
+                                </div>
+                                <span className="pd-compare-match-pct">{pct}%</span>
+                              </div>
+                            ) : (
+                              <span className="pd-compare-no-data">ยังไม่ได้วิเคราะห์</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )}
+                  {compareFaceShape && FACE_SHAPE_TIPS_TH[compareFaceShape] && (
+                    <tr>
+                      <td className="pd-compare-label">เคล็ดลับตามรูปหน้า</td>
+                      {compareList.map(p => {
+                        const tips = FACE_SHAPE_TIPS_TH[compareFaceShape]
+                        return (
+                          <td key={p.product_id} className="pd-compare-val pd-compare-val--tips">
+                            <div className="pd-compare-tips">
+                              <span className="pd-compare-tips-shape">{FACE_SHAPE_NAMES_TH[compareFaceShape] || compareFaceShape}</span>
+                              <span className="pd-compare-tips-contour">{tips.contour}</span>
+                              <span className="pd-compare-tips-styles">{tips.styles}</span>
+                            </div>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )}
                   <tr>
                     <td className="pd-compare-label">คำอธิบาย</td>
                     {compareList.map(p => <td key={p.product_id} className="pd-compare-val pd-compare-val--desc">{p.description || '-'}</td>)}

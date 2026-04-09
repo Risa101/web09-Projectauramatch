@@ -1,0 +1,72 @@
+@startuml SD09_PhotoEditor
+title SD-09 Photo Editor (Makeup)
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":EditorPage" as EP
+control ":LandmarkController" as LC
+control ":LandmarkService" as LS
+entity ":BehaviorDB" as BDB
+
+User -> EP : openPage()
+activate EP
+
+User -> EP : uploadImage(file)
+
+EP -> LC : detectLandmarks(file)
+activate LC
+
+LC -> LS : detectLandmarks(image_path)
+activate LS
+LS -> LS : dlibDetectFace(image)
+LS -> LS : extract68Points(face)
+note right : dlib shape_predictor\n68 points normalized (0-1)
+LS --> LC : Return landmarks[], face_rect, dimensions
+deactivate LS
+
+LC --> EP : Return landmarks(68 points)
+deactivate LC
+
+EP -> EP : renderImageOnCanvas(image, landmarks)
+EP --> User : displayCanvas + Makeup/Filter tabs
+
+User -> EP : selectPart(lips/eyes/blush/...)
+User -> EP : selectColor(hex) + adjustIntensity(0-100)
+EP -> EP : drawMakeupOnCanvas(\nlandmarks, color, intensity)
+note right : bezier curves +\nradial gradients +\nglobalAlpha
+
+EP -> BDB : trackEvent(makeup_select)
+activate BDB
+deactivate BDB
+
+EP --> User : displayMakeupResult(real-time)
+deactivate EP
+
+== alt [select Preset Look] ==
+
+User -> EP : selectPreset("Korean Natural")
+activate EP
+EP -> EP : applyPresetMakeup(presetData)
+EP -> BDB : trackEvent(preset_apply)
+activate BDB
+deactivate BDB
+EP --> User : displayPresetResult()
+deactivate EP
+
+== alt [select Filter] ==
+
+User -> EP : selectFilter("Vintage") / adjustSlider()
+activate EP
+EP -> EP : applyFilterOnCanvas(brightness, contrast, saturation)
+EP --> User : displayFilteredResult()
+deactivate EP
+
+== alt [face not detected] ==
+
+LS --> LC : Return error
+LC --> EP : displayError("Please upload a photo with a face")
+
+@enduml

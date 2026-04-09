@@ -71,7 +71,7 @@ export default function Analyze() {
         const analysisId = res.data.analysis_id
         await api.post(`/recommendations/generate/${analysisId}`)
         const recsRes = await api.get(`/recommendations/${analysisId}`)
-        setRecommendations(recsRes.data)
+        setRecommendations(recsRes.data.recommendations || recsRes.data)
       }
     } catch (err) {
       alert('เกิดข้อผิดพลาดในการวิเคราะห์')

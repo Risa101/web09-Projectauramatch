@@ -1,0 +1,41 @@
+@startuml SD12_ClickBuy
+title SD-12 Click Buy Link (Affiliate)
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":ProductsPage" as PP
+control ":CommissionController" as CC
+entity ":ClickLogDB" as CDB
+entity ":CommissionDB" as CMDB
+boundary ":ExternalPlatform" as EXT
+
+User -> PP : clickPlatformLink(link_id)
+activate PP
+
+PP -> CC : trackClick(link_id)
+activate CC
+
+CC -> CDB : insertClickLog(link_id, platform, ip_address, user_agent)
+activate CDB
+CDB --> CC : Return log_id
+deactivate CDB
+
+CC -> CMDB : insertCommission(link_id, platform, status=pending)
+activate CMDB
+CMDB --> CC : Return commission_id
+deactivate CMDB
+
+CC --> PP : Return redirect_url
+deactivate CC
+
+PP -> EXT : redirect(url)
+activate EXT
+note right : Shopee / TikTok Shop / Lazada
+deactivate EXT
+
+deactivate PP
+
+@enduml

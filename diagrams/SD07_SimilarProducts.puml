@@ -1,0 +1,53 @@
+@startuml SD07_SimilarProducts
+title SD-07 View Similar Products
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":ProductsPage" as PP
+control ":ProductController" as PC
+control ":SimilarityService" as SS
+entity ":ProductDB" as DB
+entity ":BehaviorDB" as BDB
+
+User -> PP : clickSimilar(product_id)
+activate PP
+
+PP -> PC : getSimilar(product_id, limit=6)
+activate PC
+
+PC -> DB : getProduct(product_id)
+activate DB
+DB --> PC : Return targetProduct
+deactivate DB
+
+PC -> DB : getAllProducts()
+activate DB
+DB --> PC : Return allProducts[]
+deactivate DB
+
+PC -> SS : getSimilarProducts(target, all, top_n=6)
+activate SS
+SS -> SS : buildTFIDF(products)
+note right : TF-IDF from\nname, description,\ncategory, brand
+SS -> SS : computeCosineSimilarity()
+SS --> PC : Return similarProducts[]
+deactivate SS
+
+PC -> BDB : trackEvent(similar_view)
+activate BDB
+deactivate BDB
+
+PC --> PP : Return similarProducts + similarity_score
+deactivate PC
+
+PP --> User : displaySimilarModal(top 6 items)
+deactivate PP
+
+== alt [no similar products found] ==
+
+PP --> User : displayEmpty("No similar products found")
+
+@enduml

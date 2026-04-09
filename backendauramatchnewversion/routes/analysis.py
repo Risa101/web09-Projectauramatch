@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from config.database import get_db
 from models.analysis import AnalysisResult, ColorPalette
-from models.product import Product
+from models.product import Product, ProductColorShade
 from models.user import User
 from routes.auth import get_current_user
 from routes.recommendations import generate_recs_for_analysis
@@ -71,17 +71,24 @@ async def create_analysis(
     # Face shape tips
     tips = FACE_SHAPE_TIPS.get(analysis.face_shape, {})
 
-    # Format recommendations
+    # Format recommendations with category grouping
     rec_list = []
+    by_category: dict[str, list] = {}
     for rec in recs[:20]:
         p = (
             db.query(Product)
-            .options(joinedload(Product.brand), joinedload(Product.links))
+            .options(
+                joinedload(Product.brand),
+                joinedload(Product.links),
+                joinedload(Product.category),
+                joinedload(Product.color_shades),
+            )
             .filter(Product.product_id == rec.product_id)
             .first()
         )
         if p:
-            rec_list.append({
+            category_name = p.category.name if p.category else "Other"
+            item = {
                 "recommendation_id": rec.recommendation_id,
                 "score": float(rec.score) if rec.score else 0,
                 "product": {
@@ -90,12 +97,15 @@ async def create_analysis(
                     "price": float(p.price) if p.price else None,
                     "image_url": p.image_url,
                     "brand": p.brand.name if p.brand else None,
+                    "category": category_name,
                     "links": [
                         {"platform": l.platform, "url": l.url}
                         for l in p.links if l.is_active
                     ],
                 },
-            })
+            }
+            rec_list.append(item)
+            by_category.setdefault(category_name, []).append(item)
 
     return {
         "analysis_id": analysis.analysis_id,
@@ -112,6 +122,7 @@ async def create_analysis(
         "palette": palette_data,
         "face_shape_tips": tips,
         "recommendations": rec_list,
+        "recommendations_by_category": by_category,
     }
 
 

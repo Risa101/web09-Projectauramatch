@@ -1,0 +1,24 @@
+@startuml SD11_Download
+title SD-11 Download Edited Photo
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":EditorPage" as EP
+entity ":BehaviorDB" as BDB
+
+User -> EP : clickDownload()
+activate EP
+
+EP -> EP : exportCanvasToImage()
+
+EP -> BDB : trackEvent(photo_download)
+activate BDB
+deactivate BDB
+
+EP --> User : downloadFile(image)
+deactivate EP
+
+@enduml

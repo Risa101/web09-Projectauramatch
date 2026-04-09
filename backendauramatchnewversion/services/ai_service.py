@@ -83,7 +83,7 @@ def analyze_face(image_path: str, gender: str = "female", db_session=None) -> di
     else:
         skin_lab = extract_skin_lab(rgb)
 
-    skin_tone = classify_tone_from_lab(skin_lab[0])
+    skin_tone = classify_tone_from_lab(skin_lab[0], skin_lab[2])
     skin_undertone = classify_undertone_from_lab(skin_lab[1], skin_lab[2])
 
     personal_color, palette_id, confidence = get_personal_color(
@@ -142,24 +142,41 @@ def detect_face_shape(rgb_image, facemesh_data=None) -> str:
     jaw_ratio = jaw_width / cheekbone_width if cheekbone_width > 0 else 0.8
     temple_ratio = temple_width / cheekbone_width if cheekbone_width > 0 else 0.9
 
-    if ratio > 1.5:
+    # Thresholds derived from Farkas (1994) facial anthropometry:
+    #   Farkas, L. G. (1994). Anthropometry of the Head and Face (2nd ed.).
+    #   Raven Press, New York.
+    #
+    #   Farkas, L. G., Hreczko, T. A., Kolar, J. C., & Munro, I. R. (1985).
+    #   Vertical and horizontal proportions of the face in young adult
+    #   North American Caucasians. Plast Reconstr Surg, 75(3), 328-338.
+    #
+    # Normative data (Farkas 1994, Table 6.5):
+    #   Total facial index (tr-gn/zy-zy): mean 1.28, SD ~0.06
+    #   Mandibular-bizygomatic (go-go/zy-zy): mean 0.71, SD ~0.04
+    #   Frontal-bizygomatic (ft-ft/zy-zy): mean 0.87, SD ~0.03
+    #
+    # MediaPipe landmarks 10/152 approximate trichion-gnathion; 234/454
+    # approximate bizygomatic; 172/397 approximate bigonial; 127/356
+    # approximate frontal width.
+
+    if ratio > 1.45:
         return "oblong"
-    elif ratio > 1.3:
-        if jaw_ratio < 0.75:
+    elif ratio > 1.30:
+        if jaw_ratio < 0.70:
             return "heart"
-        if temple_ratio < 0.85:
+        if temple_ratio < 0.82:
             return "diamond"
         return "oval"
-    elif ratio > 1.0:
-        if jaw_ratio > 0.9:
+    elif ratio > 1.15:
+        if jaw_ratio > 0.85:
             return "square"
-        if jaw_ratio < 0.75:
+        if jaw_ratio < 0.70:
             return "heart"
-        if temple_ratio < 0.85:
+        if temple_ratio < 0.82:
             return "diamond"
         return "oval"
     else:
-        if jaw_ratio > 0.9:
+        if jaw_ratio > 0.85:
             return "square"
         return "round"
 
@@ -173,7 +190,7 @@ def detect_skin_tone(rgb_image) -> tuple:
         extract_skin_lab, classify_tone_from_lab, classify_undertone_from_lab,
     )
     L, a, b = extract_skin_lab(rgb_image)
-    tone = classify_tone_from_lab(L)
+    tone = classify_tone_from_lab(L, b)
     undertone = classify_undertone_from_lab(a, b)
     return tone, undertone
 

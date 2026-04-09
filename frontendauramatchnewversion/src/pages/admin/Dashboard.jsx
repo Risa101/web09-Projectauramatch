@@ -9,6 +9,9 @@ import {
   BarChart3,
   TrendingUp,
   Sparkles,
+  FileText,
+  Activity,
+  Image,
 } from 'lucide-react'
 import './Dashboard.css'
 
@@ -160,6 +163,27 @@ export default function AdminDashboard() {
               icon={<DollarSign size={20} />}
               title="ค่าคอมมิชชั่น"
               desc="ดูสถิติและยืนยันยอด"
+              variant="pink"
+            />
+            <QuickActionCard
+              href="/admin/blog"
+              icon={<FileText size={20} />}
+              title="จัดการบทความ"
+              desc="เขียน แก้ไข เผยแพร่บทความ"
+              variant="purple"
+            />
+            <QuickActionCard
+              href="/admin/analytics"
+              icon={<Activity size={20} />}
+              title="วิเคราะห์พฤติกรรม"
+              desc="ดูสถิติการใช้งานของผู้ใช้"
+              variant="fuchsia"
+            />
+            <QuickActionCard
+              href="/admin/banners"
+              icon={<Image size={20} />}
+              title="จัดการแบนเนอร์"
+              desc="เพิ่ม แก้ไข แบนเนอร์หน้าแรก"
               variant="pink"
             />
           </div>

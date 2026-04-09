@@ -138,6 +138,56 @@ INSERT INTO products (name, brand_id, category_id, price, image_url, description
  'ไฮไลท์จากแบรนด์ไทย ราคาย่อมเยา ใช้ง่าย', 5.00);
 
 
+-- ── รองพื้น (category_id = 2) ──
+-- แหล่งอ้างอิง: https://www.watsons.co.th , https://shopee.co.th , official brand sites
+
+INSERT INTO products (name, brand_id, category_id, price, image_url, description, commission_rate) VALUES
+-- Maybelline Fit Me Matte + Poreless (ราคา ~299 บาท, อ้างอิง: watsons.co.th)
+('Maybelline Fit Me Matte + Poreless Foundation',
+ (SELECT brand_id FROM brands WHERE name='Maybelline' LIMIT 1),
+ 2, 299.00,
+ 'https://www.maybelline.com/~/media/mny/global/face-makeup/foundation/fit-me-matte-background.jpg',
+ 'รองพื้นเนื้อแมตต์ คุมมัน ปกปิดดี มี 40 เฉดสี เหมาะกับผิวมัน-ผิวผสม', 5.00),
+
+-- MAC Studio Fix Fluid SPF 15 (ราคา ~1,500 บาท, อ้างอิง: maccosmetics.co.th)
+('MAC Studio Fix Fluid SPF 15 Foundation',
+ (SELECT brand_id FROM brands WHERE name='MAC' LIMIT 1),
+ 2, 1500.00,
+ 'https://www.maccosmetics.com/media/export/cms/products/640x600/mac_sku_M6FN01_640x600_0.jpg',
+ 'รองพื้น 24 ชม. เนื้อแมตต์ ปกปิดระดับกลาง-สูง 67 เฉดสี SPF 15', 5.00),
+
+-- Canmake Marshmallow Finish Powder (ราคา ~550 บาท, อ้างอิง: watsons.co.th)
+('Canmake Marshmallow Finish Powder',
+ (SELECT brand_id FROM brands WHERE name='Canmake' LIMIT 1),
+ 2, 550.00,
+ 'https://www.canmake.com/en/images/item/62/main.jpg',
+ 'แป้งผสมรองพื้นเนื้อบางเบา ปกปิดรูขุมขน เนียนนุ่มเหมือนมาร์ชเมลโลว์ SPF 50 PA+++', 5.00),
+
+-- Mistine Wings Extra Cover Super Powder (ราคา ~199 บาท, อ้างอิง: shopee.co.th)
+('Mistine Wings Extra Cover Super Powder',
+ (SELECT brand_id FROM brands WHERE name='Mistine' LIMIT 1),
+ 2, 199.00,
+ 'https://www.mistine.co.th/uploads/product/wings-powder-thumb.jpg',
+ 'แป้งผสมรองพื้น คุมมัน กันน้ำ กันเหงื่อ SPF 25 PA++ จากแบรนด์ไทย', 5.00);
+
+-- รองพื้น Product Links
+INSERT INTO product_links (product_id, platform, url)
+SELECT product_id, 'shopee', 'https://shopee.co.th/search?keyword=maybelline+fit+me+matte+poreless'
+FROM products WHERE name='Maybelline Fit Me Matte + Poreless Foundation' LIMIT 1;
+
+INSERT INTO product_links (product_id, platform, url)
+SELECT product_id, 'shopee', 'https://shopee.co.th/search?keyword=mac+studio+fix+fluid'
+FROM products WHERE name='MAC Studio Fix Fluid SPF 15 Foundation' LIMIT 1;
+
+INSERT INTO product_links (product_id, platform, url)
+SELECT product_id, 'shopee', 'https://shopee.co.th/search?keyword=canmake+marshmallow+finish+powder'
+FROM products WHERE name='Canmake Marshmallow Finish Powder' LIMIT 1;
+
+INSERT INTO product_links (product_id, platform, url)
+SELECT product_id, 'shopee', 'https://shopee.co.th/search?keyword=mistine+wings+extra+cover+powder'
+FROM products WHERE name='Mistine Wings Extra Cover Super Powder' LIMIT 1;
+
+
 -- ── เพิ่ม Product Links (Shopee) ──
 -- ลิปสติก
 INSERT INTO product_links (product_id, platform, url)

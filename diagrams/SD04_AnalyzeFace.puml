@@ -1,0 +1,92 @@
+@startuml SD04_AnalyzeFace
+title SD-04 Analyze Face with AI
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":AnalyzePage" as AP
+control ":AnalysisController" as AC
+control ":AIService" as AI
+control ":ColorService" as CS
+control ":ScoringService" as SS
+entity ":AnalysisDB" as ADB
+entity ":PaletteDB" as PDB
+entity ":ProductDB" as PRDB
+
+User -> AP : uploadImage(file, gender)
+activate AP
+
+AP -> AC : analyzeRequest(file, gender)
+activate AC
+
+AC -> AC : saveFile(uploads/)
+
+AC -> AI : analyzeFace(image_path, gender)
+activate AI
+
+AI -> AI : runFaceMesh(image)
+note right : MediaPipe 468 points\n-> landmarks, bbox, crop
+
+AI -> AI : detectFaceShape(crop)
+note right : CNN model\n-> face_shape (7 types)
+
+AI -> CS : extractSkinLabFromBbox(image, bbox)
+activate CS
+CS -> CS : rgbToLab() + kMeansClustering(k=6)
+CS --> AI : Return skin_lab(L, a, b)
+deactivate CS
+
+AI -> CS : classifyTone(L)
+activate CS
+CS --> AI : Return skin_tone
+deactivate CS
+
+AI -> CS : classifyUndertone(a, b)
+activate CS
+CS --> AI : Return undertone
+deactivate CS
+
+AI -> PDB : loadPaletteReferences()
+activate PDB
+PDB --> AI : Return palette_refs(12 seasons)
+deactivate PDB
+
+AI -> CS : matchSeasonByDeltaE(skin_lab, palette_refs)
+activate CS
+CS -> CS : computeCIEDE2000()
+CS --> AI : Return season, palette_id, confidence
+deactivate CS
+
+AI --> AC : Return analysisResult
+deactivate AI
+
+AC -> ADB : saveAnalysis(result)
+activate ADB
+ADB --> AC : Return analysis_id
+deactivate ADB
+
+AC -> PRDB : getMatchingProducts(analysis)
+activate PRDB
+PRDB --> AC : Return products[]
+deactivate PRDB
+
+AC -> SS : computeScores(products, analysis, palette)
+activate SS
+SS -> SS : computeS1(rules) 0-300
+SS -> SS : computeS2(CIEDE2000) 0-300
+SS -> SS : computeS3(season) 0-150
+SS -> SS : computeS4(avoid) -100~0
+SS -> SS : computeS5(feedback) 0-100
+SS -> SS : computeS6(popularity) 0-50
+SS --> AC : Return rankedProducts[]
+deactivate SS
+
+AC --> AP : Return analysis + palette + tips + recommendations
+deactivate AC
+
+AP --> User : displayResults()
+deactivate AP
+
+@enduml

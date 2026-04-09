@@ -2,12 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from config.database import get_db
 from models.product import Product, ProductLink, Brand, ProductCategory
+from models.misc import ProductConcern, SkinConcern
 from services.recommendation_service import get_similar_products
+from services.cache_service import cached, invalidate_pattern
+from config.chromadb_config import is_chromadb_available
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
 
 @router.get("/brands")
+@cached("products:brands", ttl=3600)
 def get_brands(db: Session = Depends(get_db)):
     """ดึง brand ทั้งหมดที่มีสินค้า active"""
     brands = (
@@ -21,12 +25,14 @@ def get_brands(db: Session = Depends(get_db)):
 
 
 @router.get("/categories")
+@cached("products:categories", ttl=3600)
 def get_categories(db: Session = Depends(get_db)):
     """ดึง category ทั้งหมด"""
     return db.query(ProductCategory).all()
 
 
 @router.get("/")
+@cached("products:list", ttl=3600)
 def get_products(
     skip: int = 0, limit: int = 50,
     category_id: int = None,
@@ -61,6 +67,20 @@ def get_products(
 
     products = q.offset(skip).limit(limit).all()
 
+    # Batch-load product concerns
+    product_ids = [p.product_id for p in products]
+    concern_rows = (
+        db.query(ProductConcern.product_id, SkinConcern.concern_id, SkinConcern.name)
+        .join(SkinConcern, SkinConcern.concern_id == ProductConcern.concern_id)
+        .filter(ProductConcern.product_id.in_(product_ids))
+        .all()
+    ) if product_ids else []
+    concern_map: dict[int, list[dict]] = {}
+    for row in concern_rows:
+        concern_map.setdefault(row.product_id, []).append(
+            {"concern_id": row.concern_id, "name": row.name}
+        )
+
     result = []
     for p in products:
         links = []
@@ -80,6 +100,7 @@ def get_products(
             "category_name": p.category.name if p.category else None,
             "brand_name": p.brand.name if p.brand else None,
             "personal_color": p.personal_color,
+            "concerns": concern_map.get(p.product_id, []),
             "links": links,
         })
     return result
@@ -126,11 +147,12 @@ def get_similar(product_id: int, limit: int = 6, db: Session = Depends(get_db)):
     return {
         "product": target_dict,
         "similar": similar,
-        "algorithm": "TF-IDF Cosine Similarity"
+        "algorithm": "ChromaDB Vector Search" if is_chromadb_available() else "TF-IDF Cosine Similarity"
     }
 
 
 @router.get("/by-category")
+@cached("products:by_cat", ttl=3600)
 def get_products_by_category(category_name: str, limit: int = 6, db: Session = Depends(get_db)):
     """ค้นหาสินค้าตามชื่อ category (ค้นแบบ LIKE)"""
     products = (
@@ -215,6 +237,7 @@ def get_makeup_recommendations(parts: str, limit: int = 4, db: Session = Depends
 
 
 @router.get("/{product_id}")
+@cached("products:detail", ttl=3600)
 def get_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.product_id == product_id).first()
     if not product:
@@ -237,6 +260,7 @@ def create_product(
     db.add(product)
     db.commit()
     db.refresh(product)
+    invalidate_pattern("products:*")
     return product
 
 
@@ -250,6 +274,7 @@ def update_product(product_id: int, name: str = None, price: float = None,
     if price: product.price = price
     if is_active is not None: product.is_active = is_active
     db.commit()
+    invalidate_pattern("products:*")
     return product
 
 
@@ -260,6 +285,7 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Product not found")
     db.delete(product)
     db.commit()
+    invalidate_pattern("products:*")
     return {"message": "Deleted"}
 
 

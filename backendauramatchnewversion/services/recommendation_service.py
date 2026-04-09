@@ -1,139 +1,94 @@
+"""Product similarity service using ChromaDB vector search.
+
+Replaces the previous TF-IDF implementation with semantic vector search
+via sentence-transformers + ChromaDB. Falls back to TF-IDF if ChromaDB
+is unavailable.
 """
-TF-IDF Product Recommendation Service
-แนะนำสินค้าที่คล้ายกันโดยใช้ TF-IDF + Cosine Similarity
-วิเคราะห์จาก: ชื่อสินค้า, description, category, brand
-"""
-import math
-import re
-from collections import Counter
+import logging
 
+from config.chromadb_config import get_collection, is_chromadb_available
+from services.embedding_service import build_product_document, embed_single
 
-def tokenize(text):
-    """แยกคำ (ทั้งไทยและอังกฤษ)"""
-    if not text:
-        return []
-    text = text.lower().strip()
-    # แยกคำภาษาอังกฤษ + แยกตัวอักษรไทยเป็นกลุ่ม
-    tokens = re.findall(r'[a-z]+|[ก-๙]+', text)
-    return [t for t in tokens if len(t) > 1]
-
-
-def build_document(product):
-    """สร้าง document จากข้อมูลสินค้า (ให้น้ำหนักต่างกัน)"""
-    parts = []
-    # ชื่อสินค้า (น้ำหนัก x3)
-    name = product.get('name', '') or ''
-    parts.extend(tokenize(name) * 3)
-    # Description (น้ำหนัก x2)
-    desc = product.get('description', '') or ''
-    parts.extend(tokenize(desc) * 2)
-    # Category (น้ำหนัก x2)
-    cat = product.get('category_name', '') or ''
-    parts.extend(tokenize(cat) * 2)
-    # Brand (น้ำหนัก x2)
-    brand = product.get('brand_name', '') or ''
-    parts.extend(tokenize(brand) * 2)
-    return parts
-
-
-def compute_tf(tokens):
-    """คำนวณ Term Frequency"""
-    counter = Counter(tokens)
-    total = len(tokens)
-    if total == 0:
-        return {}
-    return {word: count / total for word, count in counter.items()}
-
-
-def compute_idf(documents):
-    """คำนวณ Inverse Document Frequency"""
-    n = len(documents)
-    idf = {}
-    all_words = set()
-    for doc in documents:
-        all_words.update(set(doc))
-
-    for word in all_words:
-        containing = sum(1 for doc in documents if word in set(doc))
-        idf[word] = math.log((n + 1) / (containing + 1)) + 1  # smoothed IDF
-
-    return idf
-
-
-def compute_tfidf(tf, idf):
-    """คำนวณ TF-IDF vector"""
-    return {word: tf_val * idf.get(word, 0) for word, tf_val in tf.items()}
-
-
-def cosine_similarity(vec_a, vec_b):
-    """คำนวณ Cosine Similarity ระหว่าง 2 vectors"""
-    # หา intersection ของ keys
-    common_words = set(vec_a.keys()) & set(vec_b.keys())
-    if not common_words:
-        return 0.0
-
-    dot_product = sum(vec_a[w] * vec_b[w] for w in common_words)
-    norm_a = math.sqrt(sum(v ** 2 for v in vec_a.values()))
-    norm_b = math.sqrt(sum(v ** 2 for v in vec_b.values()))
-
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-
-    return dot_product / (norm_a * norm_b)
+logger = logging.getLogger(__name__)
 
 
 def get_similar_products(target_product, all_products, top_n=6):
-    """
-    หาสินค้าที่คล้ายกับ target_product มากที่สุด
-    ใช้ TF-IDF + Cosine Similarity
+    """Find products similar to target_product.
+
+    Uses ChromaDB vector search when available, falls back to TF-IDF.
 
     Args:
-        target_product: dict ของสินค้าเป้าหมาย
-        all_products: list ของ dict สินค้าทั้งหมด
-        top_n: จำนวนสินค้าที่จะแนะนำ
+        target_product: dict with product fields (product_id, name, etc.)
+        all_products: list of product dicts (used by enrichment and TF-IDF fallback)
+        top_n: number of similar products to return
 
     Returns:
-        list ของ dict สินค้าที่คล้ายกัน พร้อม similarity score
+        list of product dicts with 'similarity_score' added
     """
-    target_id = target_product.get('product_id')
+    if is_chromadb_available():
+        try:
+            results = _chromadb_similar(target_product, top_n)
+            if results is not None:
+                return _enrich_results(results, all_products)
+        except Exception as exc:
+            logger.warning("ChromaDB search failed, falling back to TF-IDF: %s", exc)
 
-    # สร้าง documents
-    documents = []
-    product_map = {}
-    for p in all_products:
-        doc = build_document(p)
-        documents.append(doc)
-        product_map[len(documents) - 1] = p
+    from services.tfidf_fallback import get_similar_products as tfidf_similar
 
-    target_doc = build_document(target_product)
-    documents.append(target_doc)
-    target_idx = len(documents) - 1
+    return tfidf_similar(target_product, all_products, top_n)
 
-    # คำนวณ IDF จากทุก documents
-    idf = compute_idf(documents)
 
-    # คำนวณ TF-IDF ของ target
-    target_tf = compute_tf(documents[target_idx])
-    target_tfidf = compute_tfidf(target_tf, idf)
+def _chromadb_similar(target_product, top_n):
+    """Query ChromaDB for similar products."""
+    collection = get_collection()
+    if collection is None or collection.count() == 0:
+        return None
 
-    # คำนวณ similarity กับทุกสินค้า
-    similarities = []
-    for i in range(len(documents) - 1):  # ไม่รวม target
-        p = product_map[i]
-        if p.get('product_id') == target_id:
+    doc = build_product_document(target_product)
+    query_embedding = embed_single(doc)
+    if query_embedding is None:
+        return None
+
+    target_id = str(target_product.get("product_id"))
+
+    # Request top_n + 1 because the target product itself may be in results
+    n_results = min(top_n + 1, collection.count())
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=n_results,
+        where={"is_active": 1},
+    )
+
+    if not results or not results["ids"] or not results["ids"][0]:
+        return None
+
+    similar = []
+    for i, doc_id in enumerate(results["ids"][0]):
+        pid = results["metadatas"][0][i].get("product_id")
+        if str(pid) == target_id:
             continue
 
-        doc_tf = compute_tf(documents[i])
-        doc_tfidf = compute_tfidf(doc_tf, idf)
-        sim = cosine_similarity(target_tfidf, doc_tfidf)
+        # ChromaDB cosine distance = 1 - cosine_similarity
+        distance = results["distances"][0][i] if results["distances"] else 0
+        similarity = round(max(0.0, 1.0 - distance), 4)
 
-        if sim > 0:
-            similarities.append({
-                **p,
-                'similarity_score': round(sim, 4)
+        similar.append({
+            "product_id": pid,
+            "similarity_score": similarity,
+        })
+
+    return similar[:top_n]
+
+
+def _enrich_results(chroma_results, all_products):
+    """Merge ChromaDB results with full product data from all_products."""
+    product_lookup = {p["product_id"]: p for p in all_products}
+    enriched = []
+    for r in chroma_results:
+        pid = r["product_id"]
+        if pid in product_lookup:
+            enriched.append({
+                **product_lookup[pid],
+                "similarity_score": r["similarity_score"],
             })
-
-    # เรียงตาม similarity สูงสุด
-    similarities.sort(key=lambda x: x['similarity_score'], reverse=True)
-
-    return similarities[:top_n]
+    return enriched

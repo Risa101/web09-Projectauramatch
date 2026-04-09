@@ -1,0 +1,23 @@
+@startuml SD03_ViewHome
+title SD-03 View Home Page
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":HomePage" as HP
+
+User -> HP : openPage()
+activate HP
+
+HP -> HP : loadStaticContent()
+HP --> User : displayHeroSection()
+HP --> User : displayPersonalColorSeasons(4 Seasons)
+HP --> User : displayFeaturedProducts(4 items)
+HP --> User : displayUserReviews(3 reviews)
+HP --> User : displayCTAButtons()
+
+deactivate HP
+
+@enduml

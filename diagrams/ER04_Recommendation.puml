@@ -1,0 +1,91 @@
+@startuml ER04_Recommendation
+!theme plain
+skinparam linetype ortho
+skinparam dpi 150
+skinparam entity {
+    BackgroundColor #FFF0F5
+    BorderColor #2C2C2C
+    FontSize 13
+    AttributeFontSize 11
+}
+
+title **ER Diagram กลุ่มที่ 4: Recommendation Engine**\n//การแปลง Class → Table: เครื่องมือแนะนำสินค้า S1-S6//
+
+entity "products" as products <<ref กลุ่ม 2>> #FFFFF0 {
+    * **product_id** : INT <<PK>>
+    --
+    name : VARCHAR(200)
+}
+
+entity "analysis_results" as analysis_results <<ref กลุ่ม 3>> #F0FFF0 {
+    * **analysis_id** : INT <<PK>>
+    --
+    face_shape : ENUM
+    personal_color : ENUM
+}
+
+entity "users" as users <<ref กลุ่ม 1>> #D6EEFF {
+    * **user_id** : INT <<PK>>
+}
+
+entity "recommendation_rules" as recommendation_rules {
+    * **rule_id** : INT <<PK, AI>>
+    --
+    * //product_id// : INT <<FK, NN>> CASCADE
+    face_shape : ENUM(7 + 'any') = 'any'
+    skin_tone : ENUM(6 + 'any') = 'any'
+    skin_undertone : ENUM(3 + 'any') = 'any'
+    personal_color : ENUM(4 + 'any') = 'any'
+    gender : ENUM('female','male','any') = 'any'
+    ethnicity : ENUM(8 + 'any') = 'any'
+    priority : INT = 0
+}
+
+entity "recommendations" as recommendations {
+    * **recommendation_id** : INT <<PK, AI>>
+    --
+    * //analysis_id// : INT <<FK, NN>> CASCADE
+    * //product_id// : INT <<FK, NN>>
+    score : DECIMAL(5,2)
+    created_at : DATETIME = NOW()
+}
+
+entity "recommendation_feedback" as recommendation_feedback {
+    * **feedback_id** : INT <<PK, AI>>
+    --
+    * //recommendation_id// : INT <<FK, NN>> CASCADE
+    * //user_id// : INT <<FK, NN>> CASCADE
+    * rating : ENUM('like','dislike') <<NN>>
+    created_at : DATETIME = NOW()
+}
+
+entity "favorites" as favorites {
+    * **favorite_id** : INT <<PK, AI>>
+    --
+    * //user_id// : INT <<FK, NN>> CASCADE
+    * //product_id// : INT <<FK, NN>> CASCADE
+    created_at : DATETIME = NOW()
+    ..
+    UNIQUE(user_id, product_id)
+}
+
+note right of recommendations
+  <b>Class: Recommendation</b>
+  score = S1+S2+S3+S4+S5+S6
+  S1: Rule Match (0-300)
+  S2: CIEDE2000 (0-300)
+  S3: Season (0-150)
+  S4: Avoid Penalty (-100-0)
+  S5: Feedback (0-100)
+  S6: Popularity (0-50)
+end note
+
+products ||--o{ recommendation_rules : "1:N\nmatched by"
+products ||--o{ recommendations : "1:N"
+analysis_results ||--o{ recommendations : "1:N\ngenerates"
+recommendations ||--o{ recommendation_feedback : "1:N\nrated"
+users ||--o{ recommendation_feedback : "1:N"
+users ||--o{ favorites : "1:N\nsaves"
+products ||--o{ favorites : "1:N\nfavorited"
+
+@enduml

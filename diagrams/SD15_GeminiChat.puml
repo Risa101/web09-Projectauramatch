@@ -1,0 +1,70 @@
+@startuml SD15_GeminiChat
+title SD-15 Chat with AI (Gemini)
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":GeminiPage" as GP
+control ":GeminiController" as GC
+control ":GeminiService" as GS
+entity ":GeminiDB" as DB
+actor ":Google Gemini" as API
+
+User -> GP : openPage()
+activate GP
+
+GP -> GC : createSession(title)
+activate GC
+
+GC -> DB : insertSession(user_id, title)
+activate DB
+DB --> GC : Return session_id
+deactivate DB
+
+GC --> GP : Return session_id
+deactivate GC
+
+GP --> User : displayChatInterface()
+
+User -> GP : typeMessage(prompt)
+User -> GP : attachImage(file) [optional]
+User -> GP : clickSend()
+
+GP -> GC : sendChat(session_id, prompt, file)
+activate GC
+
+GC -> GS : generateWithGemini(prompt, image_path)
+activate GS
+
+GS -> API : sendRequest(prompt, image)
+activate API
+note right : Google Gemini 2.0 Flash API
+API --> GS : Return response_text
+deactivate API
+
+GS --> GC : Return response
+deactivate GS
+
+GC -> DB : saveMessage(session_id, role=user, prompt)
+activate DB
+deactivate DB
+
+GC -> DB : saveMessage(session_id, role=model, response)
+activate DB
+deactivate DB
+
+GC --> GP : Return response
+deactivate GC
+
+GP -> GP : autoScrollToLatest()
+GP --> User : displayResponse(Chat Bubble)
+deactivate GP
+
+== alt [Gemini API not responding] ==
+
+GS --> GC : Return error
+GC --> GP : displayError("Cannot connect to AI")
+
+@enduml

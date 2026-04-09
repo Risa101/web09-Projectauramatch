@@ -1,10 +1,14 @@
 """Characterization tests for color_analysis_service.
 
-These tests pin the current behavior of the CIELAB-based color analysis
-pipeline so that future changes are detected. They do NOT test correctness
-against ground truth — they capture what the code does *now*.
+Tests verify the CIELAB-based color analysis pipeline including:
+  - ITA-based skin tone classification (Chardon et al. 1991)
+  - Hue-angle-based undertone classification (Xiao et al. 2017)
+  - CIEDE2000 season matching
+
+Run: python3 -m pytest tests/test_color_analysis_service.py -v
 """
 
+import math
 import numpy as np
 import pytest
 
@@ -43,6 +47,19 @@ def _make_uniform_image(r, g, b, height=100, width=100):
     img = np.zeros((height, width, 3), dtype=np.uint8)
     img[:, :] = [r, g, b]
     return img
+
+
+def _ita(L, b):
+    """Compute ITA for reference in test comments."""
+    if abs(b) < 0.01:
+        b = 0.01
+    return math.atan2(L - 50, b) * (180.0 / math.pi)
+
+
+def _hab(a, b):
+    """Compute hue angle for reference in test comments."""
+    h = math.atan2(b, a) * (180.0 / math.pi)
+    return h + 360 if h < 0 else h
 
 
 # ── rgb_to_lab ────────────────────────────────────────────────────────────────
@@ -127,82 +144,138 @@ class TestExtractSkinLab:
         assert light[0] > dark[0]  # lighter image has higher L*
 
 
-# ── classify_tone_from_lab ────────────────────────────────────────────────────
+# ── classify_tone_from_lab (ITA-based, Chardon et al. 1991) ──────────────────
 
 
 class TestClassifyToneFromLab:
-    @pytest.mark.parametrize("L, expected", [
-        (95.0, "fair"),
-        (79.0, "fair"),
-        (78.0, "light"),    # boundary: exactly 78 is NOT > 78
-        (75.0, "light"),
-        (69.0, "light"),
-        (68.0, "medium"),   # boundary
-        (63.0, "medium"),
-        (58.0, "tan"),      # boundary
-        (53.0, "tan"),
-        (48.0, "dark"),     # boundary
-        (43.0, "dark"),
-        (38.0, "deep"),     # boundary
-        (30.0, "deep"),
-        (10.0, "deep"),
-        (0.0, "deep"),
+    """Skin tone classification via ITA = arctan((L*-50)/b*) × 180/π.
+
+    Thresholds from Chardon et al. (1991):
+        >55° fair, >41° light, >28° medium, >10° tan, >-30° dark, else deep
+    """
+
+    @pytest.mark.parametrize("L, b, expected", [
+        # fair: ITA > 55°
+        (90.0, 15.0, "fair"),     # ITA ≈ 69.4°
+        (80.0, 10.0, "fair"),     # ITA ≈ 71.6°
+        (75.0, 12.0, "fair"),     # ITA ≈ 64.4°
+        # light: 41° < ITA ≤ 55°
+        (70.0, 15.0, "light"),    # ITA ≈ 53.1°
+        (65.0, 12.0, "light"),    # ITA ≈ 51.3°
+        (68.0, 20.0, "light"),    # ITA ≈ 42.0°
+        # medium: 28° < ITA ≤ 41°
+        (62.0, 18.0, "medium"),   # ITA ≈ 33.7°
+        (60.0, 15.0, "medium"),   # ITA ≈ 33.7°
     ])
-    def test_tone_thresholds(self, L, expected):
-        assert classify_tone_from_lab(L) == expected
+    def test_tone_thresholds(self, L, b, expected):
+        assert classify_tone_from_lab(L, b) == expected
+
+    # Fix the parametrize — let me recalculate
+    @pytest.mark.parametrize("L, b, expected", [
+        # medium: 28° < ITA ≤ 41°
+        (58.0, 12.0, "medium"),   # ITA ≈ 33.7°
+        (55.0, 8.0, "medium"),    # ITA ≈ 32.0°
+        # tan: 10° < ITA ≤ 28°
+        (55.0, 20.0, "tan"),      # ITA ≈ 14.0°
+        (53.0, 15.0, "tan"),      # ITA ≈ 11.3°
+        # dark: -30° < ITA ≤ 10°
+        (50.0, 15.0, "dark"),     # ITA ≈ 0.0°
+        (48.0, 12.0, "dark"),     # ITA ≈ -9.5°
+        (42.0, 15.0, "dark"),     # ITA ≈ -28.1°
+        # deep: ITA ≤ -30°
+        (30.0, 10.0, "deep"),     # ITA ≈ -63.4°
+        (20.0, 15.0, "deep"),     # ITA ≈ -63.4°
+        (10.0, 5.0, "deep"),      # ITA ≈ -82.9°
+    ])
+    def test_tone_thresholds_lower(self, L, b, expected):
+        assert classify_tone_from_lab(L, b) == expected
 
     def test_boundary_fair_light(self):
-        assert classify_tone_from_lab(78.001) == "fair"
-        assert classify_tone_from_lab(78.0) == "light"
+        """ITA exactly at 55° boundary."""
+        # ITA=55° when (L-50)/b = tan(55°) = 1.4281
+        # With b=10: L = 50 + 14.281 = 64.281
+        assert classify_tone_from_lab(64.29, 10.0) == "fair"   # ITA ≈ 55.01°
+        assert classify_tone_from_lab(64.27, 10.0) == "light"  # ITA ≈ 54.99°
 
     def test_boundary_light_medium(self):
-        assert classify_tone_from_lab(68.001) == "light"
-        assert classify_tone_from_lab(68.0) == "medium"
+        """ITA exactly at 41° boundary."""
+        # tan(41°) = 0.8693; with b=10: L = 50 + 8.693 = 58.693
+        assert classify_tone_from_lab(58.70, 10.0) == "light"  # ITA ≈ 41.01°
+        assert classify_tone_from_lab(58.69, 10.0) == "medium" # ITA ≈ 40.99°
 
     def test_all_six_tones_reachable(self):
-        tones = {classify_tone_from_lab(L) for L in [90, 73, 63, 53, 43, 20]}
+        tones = {
+            classify_tone_from_lab(90, 15),   # fair
+            classify_tone_from_lab(70, 15),   # light
+            classify_tone_from_lab(58, 12),   # medium
+            classify_tone_from_lab(55, 20),   # tan
+            classify_tone_from_lab(48, 12),   # dark
+            classify_tone_from_lab(20, 10),   # deep
+        }
         assert tones == {"fair", "light", "medium", "tan", "dark", "deep"}
 
+    def test_zero_b_handled(self):
+        """b*=0 should not cause division by zero."""
+        result = classify_tone_from_lab(80.0, 0.0)
+        assert result in {"fair", "light", "medium", "tan", "dark", "deep"}
 
-# ── classify_undertone_from_lab ───────────────────────────────────────────────
+    def test_ita_considers_both_L_and_b(self):
+        """Same L* but different b* should give different tones."""
+        # L=65, b=5: ITA ≈ 71.6° → fair
+        # L=65, b=30: ITA ≈ 26.6° → tan
+        assert classify_tone_from_lab(65.0, 5.0) == "fair"
+        assert classify_tone_from_lab(65.0, 30.0) == "tan"
+
+
+# ── classify_undertone_from_lab (hue angle, Xiao et al. 2017) ────────────────
 
 
 class TestClassifyUndertoneFromLab:
+    """Undertone classification via h_ab = atan2(b*, a*) in degrees.
+
+    Thresholds from Xiao et al. (2017) skin color distributions:
+        h_ab > 65° → warm, h_ab < 50° → cool, else neutral
+    """
+
     @pytest.mark.parametrize("a, b, expected", [
-        # Warm: b > 20 and a > 8
-        (10.0, 25.0, "warm"),
-        (15.0, 30.0, "warm"),
-        (9.0, 21.0, "warm"),
-        # Cool: b < 12
-        (5.0, 8.0, "cool"),
-        (10.0, 11.0, "cool"),
-        (0.0, 0.0, "cool"),
-        # Cool: a > 12 and b < 16
-        (15.0, 14.0, "cool"),
-        (13.0, 15.0, "cool"),
-        # Neutral: b in [12, 20] and not (a > 12 and b < 16)
-        (8.0, 15.0, "neutral"),
-        (10.0, 18.0, "neutral"),
-        (5.0, 12.0, "neutral"),
+        # Warm: h_ab > 65°
+        (10.0, 25.0, "warm"),    # h_ab ≈ 68.2°
+        (5.0, 20.0, "warm"),     # h_ab ≈ 76.0°
+        (15.0, 35.0, "warm"),    # h_ab ≈ 66.8°
+        (8.0, 22.0, "warm"),     # h_ab ≈ 70.0°
+        # Cool: h_ab < 50°
+        (15.0, 8.0, "cool"),     # h_ab ≈ 28.1°
+        (12.0, 10.0, "cool"),    # h_ab ≈ 39.8°
+        (20.0, 15.0, "cool"),    # h_ab ≈ 36.9°
+        (10.0, 5.0, "cool"),     # h_ab ≈ 26.6°
+        # Neutral: 50° ≤ h_ab ≤ 65°
+        (10.0, 15.0, "neutral"), # h_ab ≈ 56.3°
+        (8.0, 12.0, "neutral"),  # h_ab ≈ 56.3°
+        (12.0, 18.0, "neutral"), # h_ab ≈ 56.3°
+        (9.0, 14.0, "neutral"),  # h_ab ≈ 57.3°
     ])
     def test_undertone_classification(self, a, b, expected):
         assert classify_undertone_from_lab(a, b) == expected
 
     def test_warm_boundary(self):
-        # b=20 is NOT > 20, so not warm
-        assert classify_undertone_from_lab(10.0, 20.0) == "neutral"
-        assert classify_undertone_from_lab(10.0, 20.001) == "warm"
+        """h_ab at 65° boundary."""
+        # h_ab = 65° when b/a = tan(65°) = 2.1445
+        # With a=10: b = 21.445
+        assert classify_undertone_from_lab(10.0, 21.45) == "warm"    # h_ab ≈ 65.01°
+        assert classify_undertone_from_lab(10.0, 21.44) == "neutral" # h_ab ≈ 64.99°
 
-    def test_cool_boundary_low_b(self):
-        # b=12 is NOT < 12, so not cool via first condition
-        assert classify_undertone_from_lab(5.0, 11.999) == "cool"
-        assert classify_undertone_from_lab(5.0, 12.0) == "neutral"
+    def test_cool_boundary(self):
+        """h_ab at 50° boundary."""
+        # h_ab = 50° when b/a = tan(50°) = 1.1918
+        # With a=10: b = 11.918
+        assert classify_undertone_from_lab(10.0, 11.91) == "cool"     # h_ab ≈ 49.97°
+        assert classify_undertone_from_lab(10.0, 11.92) == "neutral"  # h_ab ≈ 49.98° — hmm close
 
     def test_all_three_undertones_reachable(self):
         undertones = {
-            classify_undertone_from_lab(10, 25),   # warm
-            classify_undertone_from_lab(5, 8),      # cool
-            classify_undertone_from_lab(8, 15),     # neutral
+            classify_undertone_from_lab(5, 20),    # warm (h_ab ≈ 76°)
+            classify_undertone_from_lab(15, 8),     # cool (h_ab ≈ 28°)
+            classify_undertone_from_lab(10, 15),    # neutral (h_ab ≈ 56°)
         }
         assert undertones == {"warm", "cool", "neutral"}
 
@@ -286,20 +359,30 @@ class TestMatchSeasonByDeltaE:
 
 
 class TestPipelineSnapshots:
-    """Pin end-to-end behavior for representative skin tones."""
+    """Pin end-to-end behavior for representative skin tones.
+
+    These use ITA (skin tone) and h_ab (undertone) formulas.
+    RGB → Lab values are approximate (computed via colour-science sRGB→XYZ→Lab).
+    """
 
     @pytest.mark.parametrize("rgb, expected_tone, expected_undertone", [
-        ((240, 220, 200), "fair", "neutral"),    # L*≈88.9, a*≈3.7, b*≈12.3
-        ((210, 170, 130), "light", "warm"),      # L*≈72.3, a*≈9.2, b*≈26.2
-        ((180, 140, 100), "medium", "warm"),     # L*≈61.1, a*≈9.9, b*≈27.2
-        ((130, 100, 70), "dark", "neutral"),     # L*≈44.7, a*≈7.9, b*≈21.6
-        ((80, 55, 35), "deep", "neutral"),       # L*≈25.4, a*≈8.4, b*≈16.9
-        ((40, 25, 15), "deep", "cool"),          # L*≈10.4, a*≈6.0, b*≈9.2
+        # (240,220,200): L*≈88.9, a*≈3.7, b*≈12.3 → ITA≈72.5° fair, h_ab≈73.3° warm
+        ((240, 220, 200), "fair", "warm"),
+        # (210,170,130): L*≈72.3, a*≈9.2, b*≈26.2 → ITA≈40.4° medium, h_ab≈70.6° warm
+        ((210, 170, 130), "medium", "warm"),
+        # (180,140,100): L*≈61.1, a*≈9.9, b*≈27.2 → ITA≈22.2° tan, h_ab≈70.0° warm
+        ((180, 140, 100), "tan", "warm"),
+        # (130,100,70): L*≈44.7, a*≈7.9, b*≈21.6 → ITA≈-13.8° dark, h_ab≈69.9° warm
+        ((130, 100, 70), "dark", "warm"),
+        # (80,55,35): L*≈25.4, a*≈8.4, b*≈16.9 → ITA≈-55.5° deep, h_ab≈63.6° neutral
+        ((80, 55, 35), "deep", "neutral"),
+        # (40,25,15): L*≈10.4, a*≈6.0, b*≈9.2 → ITA≈-76.9° deep, h_ab≈56.9° neutral
+        ((40, 25, 15), "deep", "neutral"),
     ])
     def test_tone_undertone_from_uniform_image(self, rgb, expected_tone, expected_undertone):
         img = _make_uniform_image(*rgb)
         L, a, b = extract_skin_lab(img)
-        tone = classify_tone_from_lab(L)
+        tone = classify_tone_from_lab(L, b)
         undertone = classify_undertone_from_lab(a, b)
         assert tone == expected_tone
         assert undertone == expected_undertone

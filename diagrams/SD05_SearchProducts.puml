@@ -1,0 +1,71 @@
+@startuml SD05_SearchProducts
+title SD-05 Search and Filter Products
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":ProductsPage" as PP
+control ":ProductController" as PC
+entity ":ProductDB" as DB
+entity ":BehaviorDB" as BDB
+
+User -> PP : openPage()
+activate PP
+
+PP -> PC : getCategories()
+activate PC
+PC -> DB : queryCategories()
+activate DB
+DB --> PC : Return categories[]
+deactivate DB
+PC --> PP : Return categories[]
+deactivate PC
+
+PP -> PC : getBrands()
+activate PC
+PC -> DB : queryBrands()
+activate DB
+DB --> PC : Return brands[]
+deactivate DB
+PC --> PP : Return brands[]
+deactivate PC
+
+PP -> PC : getProducts(limit=50)
+activate PC
+PC -> DB : queryProducts()
+activate DB
+DB --> PC : Return products[]
+deactivate DB
+PC --> PP : Return products[]
+deactivate PC
+
+PP --> User : displayProducts + filterPanel
+deactivate PP
+
+User -> PP : search(keyword) / selectFilter(filter)
+activate PP
+
+PP -> PC : getProducts(search, category_id, brand_id, personal_color, sort)
+activate PC
+PC -> DB : queryProducts(filters)
+activate DB
+DB --> PC : Return filteredProducts[]
+deactivate DB
+
+PC -> BDB : trackEvent(search/filter)
+activate BDB
+deactivate BDB
+
+PC --> PP : Return filteredProducts[]
+deactivate PC
+
+PP --> User : displayFilteredProducts()
+deactivate PP
+
+== alt [no products found] ==
+
+PP --> User : displayEmpty("No products found")
+
+@enduml

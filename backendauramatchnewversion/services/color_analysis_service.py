@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from sklearn.cluster import KMeans
 import colour
@@ -66,32 +67,70 @@ def extract_skin_lab_from_bbox(rgb_image: np.ndarray, bbox: tuple) -> tuple:
     return float(c[0]), float(c[1]), float(c[2])
 
 
-def classify_tone_from_lab(L: float) -> str:
-    """Map CIELAB L* lightness (0-100) to a skin tone enum string."""
-    if L > 78:
+def classify_tone_from_lab(L: float, b: float) -> str:
+    """Classify skin tone using Individual Typology Angle (ITA).
+
+    ITA = arctan((L* - 50) / b*) × (180/π)
+
+    References:
+        Chardon, A., Cretois, I., & Hourseau, C. (1991). Skin colour typology
+        and suntanning pathways. Int J Cosmet Sci, 13(4), 191-208.
+
+        Del Bino, S., & Bernerd, F. (2013). Variations in skin colour and the
+        biological consequences of ultraviolet radiation exposure.
+        Br J Dermatol, 169(s3), 33-40.
+
+    Thresholds (Chardon et al. 1991, Table 1):
+        ITA > 55°  → fair (Very Light)
+        ITA > 41°  → light (Light)
+        ITA > 28°  → medium (Intermediate)
+        ITA > 10°  → tan (Tan / Mat)
+        ITA > -30° → dark (Brown)
+        ITA ≤ -30° → deep (Dark)
+    """
+    if abs(b) < 0.01:
+        b = 0.01  # avoid division by zero
+    ita = math.atan2(L - 50, b) * (180.0 / math.pi)
+
+    if ita > 55:
         return "fair"
-    elif L > 68:
+    elif ita > 41:
         return "light"
-    elif L > 58:
+    elif ita > 28:
         return "medium"
-    elif L > 48:
+    elif ita > 10:
         return "tan"
-    elif L > 38:
+    elif ita > -30:
         return "dark"
     else:
         return "deep"
 
 
 def classify_undertone_from_lab(a: float, b: float) -> str:
-    """Map CIELAB a* and b* to undertone.
+    """Classify skin undertone using CIELAB hue angle (h_ab).
 
-    - Warm: high b* (yellow) and moderate-to-high a* (red)
-    - Cool: low b* (bluish) or high a* with low b* (pinkish)
-    - Neutral: in between
+    h_ab = atan2(b*, a*) in degrees, range [0, 360).
+
+    References:
+        Xiao, K., Yates, J. M., Zardawi, F., et al. (2017). Characterising
+        the variations in ethnic skin colours: a new calibrated data base for
+        human skin. Skin Res Technol, 23(1), 21-29.
+
+        Ly, B. C. K., et al. (2020). Research Techniques Made Simple:
+        Cutaneous Colorimetry. J Invest Dermatol, 140(1), 3-12.e1.
+
+    Thresholds (derived from Xiao et al. 2017 measured skin hue distributions):
+        h_ab > 65° → warm (yellow-dominant, typical of warm-toned skin)
+        h_ab < 50° → cool (red/pink-dominant, typical of cool-toned skin)
+        50° ≤ h_ab ≤ 65° → neutral
     """
-    if b > 20 and a > 8:
+    h_ab = math.atan2(b, a) * (180.0 / math.pi)
+    if h_ab < 0:
+        h_ab += 360
+
+    if h_ab > 65:
         return "warm"
-    elif b < 12 or (a > 12 and b < 16):
+    elif h_ab < 50:
         return "cool"
     else:
         return "neutral"

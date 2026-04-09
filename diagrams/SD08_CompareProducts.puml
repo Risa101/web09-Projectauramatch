@@ -1,0 +1,66 @@
+@startuml SD08_CompareProducts
+title SD-08 Compare Products (max 3)
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":ProductsPage" as PP
+control ":RecsController" as RC
+control ":ScoringService" as SS
+entity ":AnalysisDB" as ADB
+entity ":PaletteDB" as PDB
+entity ":ProductDB" as PRDB
+
+User -> PP : selectCompare(product_ids[1-3])
+activate PP
+PP --> User : displayFloatingBar(count)
+
+User -> PP : clickCompare()
+
+PP -> RC : compare(analysis_id, product_ids)
+activate RC
+
+RC -> ADB : getAnalysis(analysis_id)
+activate ADB
+ADB --> RC : Return analysis(face_shape, palette_id)
+deactivate ADB
+
+RC -> PDB : getPalette(palette_id)
+activate PDB
+PDB --> RC : Return palette(best_colors, avoid_colors)
+deactivate PDB
+
+RC -> PRDB : getProductShades(product_ids)
+activate PRDB
+PRDB --> RC : Return shades[]
+deactivate PRDB
+
+RC -> SS : computeColorProximity(shades, best_colors)
+activate SS
+SS --> RC : Return S2 per product
+deactivate SS
+
+RC -> SS : computeAvoidPenalty(shades, avoid_colors)
+activate SS
+SS --> RC : Return S4 per product
+deactivate SS
+
+RC -> RC : match_pct = clamp((S2+S4)/300*100, 0, 100)
+
+RC --> PP : Return face_shape + products{match_pct}
+deactivate RC
+
+PP --> User : displayCompareModal(\nname, brand, price, category,\nColor Match %, Face Shape Tips,\nbuy links)
+deactivate PP
+
+== alt [no analysis result] ==
+
+PP --> User : displayCompareModal(without Color Match / Face Tips rows)
+
+== alt [selected more than 3] ==
+
+PP --> User : alertMessage("Maximum 3 products")
+
+@enduml

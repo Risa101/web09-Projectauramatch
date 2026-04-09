@@ -1,0 +1,74 @@
+@startuml SD10_SaveLook
+title SD-10 Save Makeup Look
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":EditorPage" as EP
+control ":LookController" as LC
+entity ":SavedLookDB" as DB
+
+User -> EP : clickSaveLook()
+activate EP
+
+EP --> User : displayForm(name, category)
+
+User -> EP : inputLookData(name, category)
+User -> EP : clickSave()
+
+EP -> EP : collectMakeupData()
+EP -> EP : collectFilterData()
+
+EP -> LC : saveLook(name, category, makeup_data, filter_data)
+activate LC
+
+LC -> DB : insertLook(user_id, name, category, makeup_data, filter_data)
+activate DB
+DB --> LC : Return look_id
+deactivate DB
+
+LC --> EP : Return savedLook
+deactivate LC
+
+EP --> User : displaySavedLooks(looks[])
+deactivate EP
+
+== alt [load saved look] ==
+
+User -> EP : selectLook(look_id)
+activate EP
+
+EP -> LC : getLooks()
+activate LC
+LC -> DB : queryLooks(user_id)
+activate DB
+DB --> LC : Return looks[]
+deactivate DB
+LC --> EP : Return lookData(makeup_data, filter_data)
+deactivate LC
+
+EP -> EP : applyMakeupOnCanvas(makeup_data)
+EP -> EP : applyFilterOnCanvas(filter_data)
+EP --> User : displayLoadedLook()
+deactivate EP
+
+== alt [delete look] ==
+
+User -> EP : clickDelete(look_id)
+activate EP
+
+EP -> LC : deleteLook(look_id)
+activate LC
+LC -> DB : deleteLook(look_id)
+activate DB
+DB --> LC : Return Success
+deactivate DB
+LC --> EP : Return updated looks[]
+deactivate LC
+
+EP --> User : updateSavedLooks()
+deactivate EP
+
+@enduml

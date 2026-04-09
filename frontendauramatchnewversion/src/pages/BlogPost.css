@@ -1,0 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+
+.blogpost-page {
+  min-height: 100vh;
+  background-color: #faf9f7;
+  font-family: 'Prompt', 'Noto Sans Thai', sans-serif;
+}
+
+.blogpost-container {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+}
+
+@media (min-width: 640px) {
+  .blogpost-container { padding-left: 1.5rem; padding-right: 1.5rem; }
+}
+
+/* ── Back Link ── */
+.blogpost-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #7c3aed;
+  text-decoration: none;
+  margin-bottom: 2rem;
+  transition: color 0.2s;
+}
+
+.blogpost-back-link:hover {
+  color: #6d28d9;
+}
+
+/* ── Article ── */
+.blogpost-article__header {
+  margin-bottom: 2rem;
+}
+
+.blogpost-article__category {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #7c3aed;
+  background: #f5f3ff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  margin-bottom: 0.75rem;
+}
+
+.blogpost-article__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+  margin-bottom: 1rem;
+}
+
+.blogpost-article__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.blogpost-article__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.blogpost-article__thumb {
+  width: 100%;
+  border-radius: 0.75rem;
+  margin-bottom: 2rem;
+  object-fit: cover;
+  max-height: 24rem;
+}
+
+.blogpost-article__content {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Error / Loading ── */
+.blogpost-error {
+  text-align: center;
+  padding: 4rem 1rem;
+}
+
+.blogpost-error__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.blogpost-error__desc {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  margin-bottom: 1.5rem;
+}
+
+.blogpost-loading {
+  text-align: center;
+  padding: 4rem 1rem;
+  font-size: 0.9rem;
+  color: #9ca3af;
+}

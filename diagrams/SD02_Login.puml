@@ -1,0 +1,76 @@
+@startuml SD02_Login
+title SD-02 Login
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":User" as User
+boundary ":LoginPage" as LP
+control ":AuthController" as AC
+entity ":UserDB" as DB
+boundary ":HomePage" as HP
+boundary ":AdminDashboard" as AD
+
+User -> LP : login(email, password)
+activate LP
+
+LP -> AC : validateLogin(email, password)
+activate AC
+
+AC -> DB : getUser(email)
+activate DB
+DB --> AC : Return UserData
+deactivate DB
+
+AC -> AC : verifyPassword(password, hash)
+AC -> AC : createJWT(user_id, role)
+
+AC --> LP : Return JWT Token + role
+deactivate AC
+
+LP -> LP : saveToken(localStorage)
+
+LP -> HP : openPage(token)
+activate HP
+deactivate HP
+deactivate LP
+
+== alt [invalid email/password] ==
+
+User -> LP : login(email, password)
+activate LP
+
+LP -> AC : validateLogin(email, password)
+activate AC
+
+AC -> DB : getUser(email)
+activate DB
+DB --> AC : Return Not Found
+deactivate DB
+
+AC --> LP : errorMessageScript
+deactivate AC
+
+LP --> User : errorMessage("Invalid email or password")
+deactivate LP
+
+== alt [role = admin] ==
+
+User -> LP : login(email, password)
+activate LP
+LP -> AC : validateLogin(email, password)
+activate AC
+AC -> DB : getUser(email)
+activate DB
+DB --> AC : Return UserData(role=admin)
+deactivate DB
+AC -> AC : verifyPassword + createJWT
+AC --> LP : Return JWT Token + role=admin
+deactivate AC
+LP -> AD : openPage(token)
+activate AD
+deactivate AD
+deactivate LP
+
+@enduml

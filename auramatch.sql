@@ -211,6 +211,7 @@ CREATE TABLE products (
     description     TEXT,
     price           DECIMAL(10,2),
     image_url       VARCHAR(255),
+    personal_color  VARCHAR(50),
     commission_rate DECIMAL(5,2) DEFAULT 0,
     is_active       TINYINT(1) DEFAULT 1,
     created_at      DATETIME DEFAULT NOW(),
@@ -224,7 +225,7 @@ ALTER TABLE product_concerns
 CREATE TABLE product_links (
     link_id    INT PRIMARY KEY AUTO_INCREMENT,
     product_id INT NOT NULL,
-    platform   ENUM('shopee','tiktok','lazada') NOT NULL,
+    platform   ENUM('shopee','tiktok','lazada','sephora','watsons','ulta') NOT NULL,
     url        VARCHAR(500) NOT NULL,
     is_active  TINYINT(1) DEFAULT 1,
     created_at DATETIME DEFAULT NOW(),
@@ -436,6 +437,33 @@ CREATE TABLE admin_logs (
 );
 
 -- ============================================================
+-- GROUP 14: BEHAVIORAL ANALYTICS (2 tables)
+-- ============================================================
+
+CREATE TABLE user_behaviors (
+    id         INT PRIMARY KEY AUTO_INCREMENT,
+    user_id    INT,
+    session_id VARCHAR(100),
+    event_type VARCHAR(50) NOT NULL,
+    event_data JSON,
+    page       VARCHAR(50),
+    created_at DATETIME DEFAULT NOW(),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+CREATE TABLE saved_looks (
+    look_id       INT PRIMARY KEY AUTO_INCREMENT,
+    user_id       INT NOT NULL,
+    name          VARCHAR(100) NOT NULL,
+    category      VARCHAR(50),
+    makeup_data   JSON NOT NULL,
+    filter_data   JSON,
+    thumbnail_url VARCHAR(500),
+    created_at    DATETIME DEFAULT NOW(),
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- SAMPLE SEED DATA
 -- ============================================================
 
@@ -466,7 +494,7 @@ INSERT INTO color_palettes (season, sub_type, description, makeup_tips) VALUES
 ('winter',  'True Winter',    'สีเข้ม คม ตัดกัน',            'เลือกลิปสีแดง เบอร์กันดี บลัชสีเย็น');
 
 -- ============================================================
--- SUMMARY: 35 TABLES TOTAL
+-- SUMMARY: 37 TABLES TOTAL
 -- ============================================================
 -- Group 1  | User & Auth        | users, user_profiles, password_resets
 -- Group 2  | AI Analysis        | color_palettes, analysis_results, analysis_reviews
@@ -483,4 +511,5 @@ INSERT INTO color_palettes (season, sub_type, description, makeup_tips) VALUES
 -- Group 11 | Notification       | notifications
 -- Group 12 | Marketing          | banners, search_history
 -- Group 13 | Admin              | admin_logs
+-- Group 14 | Analytics          | user_behaviors, saved_looks
 -- ============================================================

@@ -17,3 +17,6 @@ google-generativeai==0.5.4
 dlib==19.24.4
 scikit-learn==1.4.2
 colour-science==0.4.4
+redis==5.0.8
+chromadb==0.5.23
+sentence-transformers==3.3.1

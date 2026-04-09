@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Cpu, Eye, Layers, Star, ArrowRight, Sparkles, Camera, ShoppingBag } from 'lucide-react'
+import { bannerApi } from '../api/axios'
 import './Home.css'
 
 /* ── DATA ── */
@@ -108,6 +109,23 @@ export default function Home() {
   const heroRef = useRef(null)
   const mouse = useMouseParallax(heroRef, 0.012)
 
+  const [banners, setBanners] = useState([])
+  const [currentSlide, setCurrentSlide] = useState(0)
+
+  useEffect(() => {
+    bannerApi.getActive('home_top')
+      .then(res => setBanners(res.data))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (banners.length <= 1) return
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % banners.length)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [banners.length])
+
   return (
     <div className="home">
 
@@ -197,6 +215,39 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* ── BANNER CAROUSEL ── */}
+      {banners.length > 0 && (
+        <section className="banner-carousel">
+          <div
+            className="banner-carousel__track"
+            style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+          >
+            {banners.map(b => (
+              <a
+                key={b.banner_id}
+                href={b.link_url || '#'}
+                className="banner-carousel__slide"
+                target={b.link_url ? '_blank' : undefined}
+                rel="noopener noreferrer"
+              >
+                <img src={b.image_url} alt={b.title || ''} />
+              </a>
+            ))}
+          </div>
+          {banners.length > 1 && (
+            <div className="banner-carousel__dots">
+              {banners.map((_, i) => (
+                <button
+                  key={i}
+                  className={`banner-carousel__dot ${i === currentSlide ? 'banner-carousel__dot--active' : ''}`}
+                  onClick={() => setCurrentSlide(i)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── HOW IT WORKS ── */}
       <section className="how-section">

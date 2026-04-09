@@ -23,6 +23,15 @@ Thumbs.db
 # Uploads
 uploads/
 
+# ChromaDB persistent storage
+data/
+
+# Downloaded swatch images
+swatches/
+
+# Vim swap files
+*.swp
+
 # Claude/Playwright tool dirs
 .claude/
 .playwright-mcp/

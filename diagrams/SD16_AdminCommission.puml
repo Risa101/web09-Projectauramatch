@@ -1,0 +1,49 @@
+@startuml SD16_AdminCommission
+title SD-16 View Commission Stats (Admin)
+
+skinparam style strictuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor ":Admin" as Admin
+boundary ":AdminDashboard" as AD
+control ":CommissionController" as CC
+entity ":ClickLogDB" as CDB
+entity ":CommissionDB" as CMDB
+
+Admin -> AD : openPage()
+activate AD
+
+AD -> CC : getStats()
+activate CC
+
+CC -> CDB : countClicks()
+activate CDB
+CDB --> CC : Return total_clicks
+deactivate CDB
+
+CC -> CDB : countClicksByPlatform()
+activate CDB
+CDB --> CC : Return clicks_by_platform
+deactivate CDB
+
+CC -> CMDB : sumCommission()
+activate CMDB
+CMDB --> CC : Return total_commission(THB)
+deactivate CMDB
+
+CC -> CMDB : sumCommissionByPlatform()
+activate CMDB
+CMDB --> CC : Return commission_by_platform
+deactivate CMDB
+
+CC --> AD : Return stats
+deactivate CC
+
+AD --> Admin : displayStatCards(\nTotal Clicks,\nTotal Commission THB)
+
+AD --> Admin : displayPlatformTable(\nShopee: clicks + commission,\nTikTok: clicks + commission,\nLazada: clicks + commission)
+
+deactivate AD
+
+@enduml

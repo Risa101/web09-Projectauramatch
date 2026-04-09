@@ -1,0 +1,553 @@
+@startuml AuraMatch_ER_Diagram
+!theme plain
+skinparam linetype ortho
+skinparam dpi 200
+
+skinparam entity {
+    BackgroundColor #D6EEFF
+    BorderColor #2C2C2C
+    FontSize 13
+    AttributeFontSize 11
+    StereotypeFontSize 10
+}
+
+skinparam class {
+    BackgroundColor #D6EEFF
+    BorderColor #2C2C2C
+}
+
+title **AuraMatch — Entity-Relationship Diagram**\n//การแปลง ORM Class เป็นตารางในฐานข้อมูลเชิงสัมพันธ์//\n23 Tables · MySQL (InnoDB)
+
+legend bottom left
+  |= สัญลักษณ์ |= ความหมาย |
+  | **PK** | Primary Key (คีย์หลัก) |
+  | **FK** | Foreign Key (คีย์นอก) |
+  | **UK** | Unique Key (คีย์ไม่ซ้ำ) |
+  | **NN** | Not Null (ห้ามว่าง) |
+  | ||--|{ | One-to-Many (หนึ่งต่อหลาย) |
+  | ||--|| | One-to-One (หนึ่งต่อหนึ่ง) |
+  | }|--|{ | Many-to-Many (หลายต่อหลาย) |
+endlegend
+
+' ════════════════════════════════════════
+' Group 1: User & Authentication
+' ════════════════════════════════════════
+
+package "User & Authentication\n(ผู้ใช้งานและการยืนยันตัวตน)" as PKG_USER #F0F8FF {
+
+    entity "users" as users {
+        * **user_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * username : VARCHAR(50) <<UK, NN>>
+        * email : VARCHAR(100) <<UK, NN>>
+        * password_hash : VARCHAR(255) <<NN>>
+        role : ENUM('admin','user') = 'user'
+        is_active : INT = 1
+        created_at : DATETIME = NOW()
+    }
+
+    entity "user_profiles" as user_profiles {
+        * **profile_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //user_id// : INT <<FK, UK, NN>>
+        first_name : VARCHAR(100)
+        last_name : VARCHAR(100)
+        display_name : VARCHAR(100)
+        avatar_url : VARCHAR(255)
+        birth_date : DATE
+        gender : ENUM('female','male',\n\t'non_binary','prefer_not_to_say')
+        nationality : VARCHAR(100)
+        bio : TEXT
+        updated_at : DATETIME
+    }
+
+    entity "password_resets" as password_resets {
+        * **reset_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //user_id// : INT <<FK, NN>>
+        * token : VARCHAR(255) <<UK, NN>>
+        * expires_at : DATETIME <<NN>>
+        created_at : DATETIME = NOW()
+    }
+}
+
+' ════════════════════════════════════════
+' Group 2: Product Catalog
+' ════════════════════════════════════════
+
+package "Product Catalog\n(แคตาล็อกสินค้า)" as PKG_PRODUCT #FFFFF0 {
+
+    entity "brands" as brands {
+        * **brand_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * name : VARCHAR(100) <<NN>>
+        logo_url : VARCHAR(255)
+        website_url : VARCHAR(255)
+        description : TEXT
+        is_active : INT = 1
+        created_at : DATETIME = NOW()
+    }
+
+    entity "product_categories" as product_categories {
+        * **category_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * name : VARCHAR(100) <<NN>>
+        description : TEXT
+        icon_url : VARCHAR(255)
+    }
+
+    entity "products" as products {
+        * **product_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        //brand_id// : INT <<FK>> → brands
+        //category_id// : INT <<FK>> → product_categories
+        * name : VARCHAR(200) <<NN>>
+        description : TEXT
+        price : DECIMAL(10,2)
+        image_url : VARCHAR(255)
+        personal_color : VARCHAR(50)
+        commission_rate : DECIMAL(5,2) = 0
+        is_active : INT = 1
+        created_at : DATETIME = NOW()
+    }
+
+    entity "product_links" as product_links {
+        * **link_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //product_id// : INT <<FK, NN>>
+        * platform : ENUM('shopee','tiktok',\n\t'lazada','sephora','watsons','ulta') <<NN>>
+        * url : VARCHAR(500) <<NN>>
+        is_active : INT = 1
+        created_at : DATETIME = NOW()
+    }
+
+    entity "product_color_shades" as product_color_shades {
+        * **shade_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //product_id// : INT <<FK, NN>>
+        shade_name : VARCHAR(100)
+        shade_code : VARCHAR(20)
+        hex_color : VARCHAR(7)
+        image_url : VARCHAR(255)
+        is_active : INT = 1
+    }
+
+    entity "product_tags" as product_tags {
+        * **tag_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * name : VARCHAR(100) <<UK, NN>>
+    }
+
+    entity "product_tag_map" as product_tag_map {
+        * **id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //product_id// : INT <<FK, NN>>
+        * //tag_id// : INT <<FK, NN>>
+    }
+}
+
+' ════════════════════════════════════════
+' Group 3: AI Analysis & Color Science
+' ════════════════════════════════════════
+
+package "AI Analysis & Color Science\n(การวิเคราะห์ใบหน้าและวิทยาศาสตร์สี)" as PKG_ANALYSIS #F0FFF0 {
+
+    entity "color_palettes" as color_palettes {
+        * **palette_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * season : ENUM('spring','summer',\n\t'autumn','winter') <<NN>>
+        sub_type : VARCHAR(50)
+        description : TEXT
+        best_colors : JSON {L*,a*,b*}
+        avoid_colors : JSON {L*,a*,b*}
+        makeup_tips : TEXT
+        created_at : DATETIME = NOW()
+    }
+
+    entity "analysis_results" as analysis_results {
+        * **analysis_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //user_id// : INT <<FK, NN>>
+        image_path : VARCHAR(255)
+        gender : ENUM('female','male','non_binary')
+        ethnicity : ENUM('asian','caucasian','african',\n\t'latino','middle_eastern',\n\t'south_asian','mixed','other')
+        nationality : VARCHAR(100)
+        face_shape : ENUM('oval','round','square',\n\t'heart','oblong','diamond','triangle')
+        skin_tone : ENUM('fair','light','medium',\n\t'tan','dark','deep')
+        skin_undertone : ENUM('warm','cool','neutral')
+        personal_color : ENUM('spring','summer',\n\t'autumn','winter')
+        //palette_id// : INT <<FK>> → color_palettes
+        confidence_score : DECIMAL(5,2)
+        created_at : DATETIME = NOW()
+    }
+
+    entity "analysis_reviews" as analysis_reviews {
+        * **review_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //analysis_id// : INT <<FK, NN>>
+        * //user_id// : INT <<FK, NN>>
+        is_accurate : INT
+        comment : TEXT
+        created_at : DATETIME = NOW()
+    }
+}
+
+' ════════════════════════════════════════
+' Group 4: Recommendation Engine
+' ════════════════════════════════════════
+
+package "Recommendation Engine\n(เครื่องมือแนะนำสินค้า — S1-S6)" as PKG_REC #FFF0F5 {
+
+    entity "recommendation_rules" as recommendation_rules {
+        * **rule_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //product_id// : INT <<FK, NN>>
+        face_shape : ENUM(7 shapes + 'any') = 'any'
+        skin_tone : ENUM(6 tones + 'any') = 'any'
+        skin_undertone : ENUM('warm','cool',\n\t'neutral','any') = 'any'
+        personal_color : ENUM(4 seasons + 'any') = 'any'
+        gender : ENUM('female','male','any') = 'any'
+        ethnicity : ENUM(8 + 'any') = 'any'
+        priority : INT = 0
+    }
+
+    entity "recommendations" as recommendations {
+        * **recommendation_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //analysis_id// : INT <<FK, NN>>
+        * //product_id// : INT <<FK, NN>>
+        score : DECIMAL(5,2)
+        created_at : DATETIME = NOW()
+    }
+
+    entity "recommendation_feedback" as recommendation_feedback {
+        * **feedback_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //recommendation_id// : INT <<FK, NN>>
+        * //user_id// : INT <<FK, NN>>
+        * rating : ENUM('like','dislike') <<NN>>
+        created_at : DATETIME = NOW()
+    }
+
+    entity "favorites" as favorites {
+        * **favorite_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //user_id// : INT <<FK, NN>>
+        * //product_id// : INT <<FK, NN>>
+        created_at : DATETIME = NOW()
+        ..
+        UNIQUE(user_id, product_id)
+    }
+}
+
+' ════════════════════════════════════════
+' Group 5: Skin Concerns
+' ════════════════════════════════════════
+
+package "Skin Concerns\n(ปัญหาผิวพรรณ)" as PKG_SKIN #FFF8F0 {
+
+    entity "skin_concerns" as skin_concerns {
+        * **concern_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * name : VARCHAR(100) <<NN>>
+        description : TEXT
+        icon_url : VARCHAR(255)
+    }
+
+    entity "user_skin_concerns" as user_skin_concerns {
+        * **id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //user_id// : INT <<FK, NN>>
+        * //concern_id// : INT <<FK, NN>>
+        severity : ENUM('mild','moderate','severe') = 'mild'
+        created_at : DATETIME = NOW()
+    }
+
+    entity "product_concerns" as product_concerns {
+        * **id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //product_id// : INT <<FK, NN>>
+        * //concern_id// : INT <<FK, NN>>
+    }
+}
+
+' ════════════════════════════════════════
+' Group 6: Commerce & Affiliate
+' ════════════════════════════════════════
+
+package "Commerce & Affiliate\n(ระบบ Affiliate และค่าคอมมิชชั่น)" as PKG_COMMERCE #F5F0FF {
+
+    entity "click_logs" as click_logs {
+        * **log_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //link_id// : INT <<FK, NN>>
+        //user_id// : INT <<FK>>
+        * platform : ENUM('shopee','tiktok','lazada') <<NN>>
+        ip_address : VARCHAR(45)
+        user_agent : TEXT
+        clicked_at : DATETIME = NOW()
+    }
+
+    entity "commissions" as commissions {
+        * **commission_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //link_id// : INT <<FK, NN>>
+        //user_id// : INT <<FK>>
+        * platform : ENUM('shopee','tiktok','lazada') <<NN>>
+        amount : DECIMAL(10,2)
+        status : ENUM('pending','confirmed','paid') = 'pending'
+        clicked_at : DATETIME = NOW()
+    }
+
+    entity "product_reviews" as product_reviews {
+        * **review_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //product_id// : INT <<FK, NN>>
+        * //user_id// : INT <<FK, NN>>
+        * rating : INT <<NN>>
+        comment : TEXT
+        image_url : VARCHAR(255)
+        platform : ENUM('shopee','tiktok','lazada','other')
+        is_verified : INT = 0
+        created_at : DATETIME = NOW()
+    }
+}
+
+' ════════════════════════════════════════
+' Group 7: Gemini AI Chat
+' ════════════════════════════════════════
+
+package "Gemini AI Chat\n(แชทบอท AI)" as PKG_GEMINI #F0FFFF {
+
+    entity "gemini_sessions" as gemini_sessions {
+        * **session_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //user_id// : INT <<FK, NN>>
+        //analysis_id// : INT <<FK>>
+        title : VARCHAR(200)
+        created_at : DATETIME = NOW()
+    }
+
+    entity "gemini_messages" as gemini_messages {
+        * **message_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //session_id// : INT <<FK, NN>>
+        * role : ENUM('user','model') <<NN>>
+        prompt : TEXT
+        response : TEXT
+        image_input : VARCHAR(255)
+        image_output : VARCHAR(255)
+        created_at : DATETIME = NOW()
+    }
+}
+
+' ════════════════════════════════════════
+' Group 8: Photo Editor
+' ════════════════════════════════════════
+
+package "Photo Editor\n(ตัวแต่งรูปภาพ)" as PKG_PHOTO #FFFAF0 {
+
+    entity "photo_edits" as photo_edits {
+        * **edit_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //user_id// : INT <<FK, NN>>
+        original_image : VARCHAR(255)
+        edited_image : VARCHAR(255)
+        edit_config : JSON
+        source : ENUM('upload','analysis','gemini') = 'upload'
+        created_at : DATETIME = NOW()
+    }
+
+    entity "saved_looks" as saved_looks {
+        * **look_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //user_id// : INT <<FK, NN>>
+        * name : VARCHAR(100) <<NN>>
+        category : VARCHAR(50)
+        * makeup_data : JSON <<NN>>
+        filter_data : JSON
+        thumbnail_url : VARCHAR(500)
+        created_at : DATETIME = NOW()
+    }
+
+    entity "edit_filters" as edit_filters {
+        * **filter_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * name : VARCHAR(100) <<NN>>
+        * category : ENUM('beauty','color',\n\t'light','vintage','makeup') <<NN>>
+        thumbnail_url : VARCHAR(255)
+        config : JSON
+        is_active : INT = 1
+        created_at : DATETIME = NOW()
+    }
+
+    entity "edit_stickers" as edit_stickers {
+        * **sticker_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * name : VARCHAR(100) <<NN>>
+        * category : ENUM('face','decoration',\n\t'text','emoji') <<NN>>
+        image_url : VARCHAR(255)
+        is_active : INT = 1
+        created_at : DATETIME = NOW()
+    }
+}
+
+' ════════════════════════════════════════
+' Group 9: Blog
+' ════════════════════════════════════════
+
+package "Blog\n(บล็อก)" as PKG_BLOG #F8FFF0 {
+
+    entity "blog_categories" as blog_categories {
+        * **category_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * name : VARCHAR(100) <<NN>>
+        description : TEXT
+        created_at : DATETIME = NOW()
+    }
+
+    entity "blog_posts" as blog_posts {
+        * **post_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        //category_id// : INT <<FK>>
+        * //author_id// : INT <<FK, NN>>
+        * title : VARCHAR(200) <<NN>>
+        slug : VARCHAR(200) <<UK>>
+        content : TEXT
+        thumbnail_url : VARCHAR(255)
+        views : INT = 0
+        is_published : INT = 0
+        published_at : DATETIME
+        created_at : DATETIME = NOW()
+        updated_at : DATETIME
+    }
+}
+
+' ════════════════════════════════════════
+' Group 10: Admin, Notifications & Analytics
+' ════════════════════════════════════════
+
+package "Admin & Analytics\n(แอดมินและการวิเคราะห์)" as PKG_ADMIN #FFF0F0 {
+
+    entity "notifications" as notifications {
+        * **notification_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //user_id// : INT <<FK, NN>>
+        * title : VARCHAR(200) <<NN>>
+        message : TEXT
+        type : ENUM('recommendation','promotion',\n\t'system','review') = 'system'
+        is_read : INT = 0
+        created_at : DATETIME = NOW()
+    }
+
+    entity "admin_logs" as admin_logs {
+        * **log_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        * //admin_id// : INT <<FK, NN>>
+        * action : VARCHAR(100) <<NN>>
+        table_name : VARCHAR(100)
+        record_id : INT
+        old_value : JSON
+        new_value : JSON
+        ip_address : VARCHAR(45)
+        created_at : DATETIME = NOW()
+    }
+
+    entity "search_history" as search_history {
+        * **search_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        //user_id// : INT <<FK>>
+        * keyword : VARCHAR(255) <<NN>>
+        created_at : DATETIME = NOW()
+    }
+
+    entity "user_behaviors" as user_behaviors {
+        * **id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        //user_id// : INT <<FK>>
+        session_id : VARCHAR(100)
+        * event_type : VARCHAR(50) <<NN>>
+        event_data : JSON
+        page : VARCHAR(50)
+        created_at : DATETIME = NOW()
+    }
+
+    entity "banners" as banners {
+        * **banner_id** : INT <<PK, AUTO_INCREMENT>>
+        --
+        title : VARCHAR(200)
+        * image_url : VARCHAR(255) <<NN>>
+        link_url : VARCHAR(500)
+        position : ENUM('home_top','home_middle',\n\t'sidebar') = 'home_top'
+        starts_at : DATETIME
+        ends_at : DATETIME
+        is_active : INT = 1
+        created_at : DATETIME = NOW()
+    }
+}
+
+
+' ════════════════════════════════════════
+' RELATIONSHIPS (ความสัมพันธ์)
+' ════════════════════════════════════════
+
+' ── User 1:1 ──
+users ||--|| user_profiles : "1:1\nhas profile"
+users ||--o{ password_resets : "1:N\nrequests reset"
+
+' ── User 1:N ──
+users ||--o{ analysis_results : "1:N\nuploads"
+users ||--o{ favorites : "1:N\nsaves"
+users ||--o{ notifications : "1:N\nreceives"
+users ||--o{ gemini_sessions : "1:N\nchats"
+users ||--o{ blog_posts : "1:N\nauthors"
+users ||--o{ photo_edits : "1:N\nedits"
+users ||--o{ saved_looks : "1:N\nsaves look"
+users ||--o{ product_reviews : "1:N\nreviews"
+users ||--o{ recommendation_feedback : "1:N\nfeedback"
+users ||--o{ search_history : "1:N\nsearches"
+users ||--o{ user_skin_concerns : "1:N\nhas concern"
+users ||--o{ admin_logs : "1:N\nlogs action"
+users ||--o{ user_behaviors : "1:N\ntracked"
+users ||--o{ analysis_reviews : "1:N\nreviews"
+users ||--o{ click_logs : "1:N\nclicks"
+users ||--o{ commissions : "1:N\nearns"
+
+' ── Product hierarchy ──
+brands ||--o{ products : "1:N\nowns"
+product_categories ||--o{ products : "1:N\ncategorizes"
+
+' ── Product details ──
+products ||--o{ product_links : "1:N\nsold on"
+products ||--o{ product_color_shades : "1:N\nhas shades"
+products ||--o{ product_tag_map : "1:N\ntagged"
+product_tags ||--o{ product_tag_map : "1:N\napplied"
+products ||--o{ product_reviews : "1:N\nreviewed"
+products ||--o{ favorites : "1:N\nfavorited"
+products ||--o{ recommendation_rules : "1:N\nrule"
+products ||--o{ recommendations : "1:N\nrecommended"
+products ||--o{ product_concerns : "1:N\naddresses"
+
+' ── Analysis ──
+color_palettes ||--o{ analysis_results : "1:N\nassigned"
+analysis_results ||--o{ recommendations : "1:N\ngenerates"
+analysis_results ||--o{ analysis_reviews : "1:N\nreviewed"
+
+' ── Recommendation chain ──
+recommendations ||--o{ recommendation_feedback : "1:N\nrated"
+
+' ── Commerce ──
+product_links ||--o{ click_logs : "1:N\nclicked"
+product_links ||--o{ commissions : "1:N\nearns"
+
+' ── Gemini ──
+gemini_sessions ||--o{ gemini_messages : "1:N\ncontains"
+
+' ── Blog ──
+blog_categories ||--o{ blog_posts : "1:N\ngroups"
+
+' ── Skin concerns ──
+skin_concerns ||--o{ user_skin_concerns : "1:N\nreported"
+skin_concerns ||--o{ product_concerns : "1:N\ntreated"
+
+@enduml
